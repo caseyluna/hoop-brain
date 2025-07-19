@@ -1,0 +1,9 @@
+version: "3"
+
+tasks:
+  ingest:
+    desc: Run ingestion pipeline via Dagger
+    vars:
+      MODULE: boxscore
+    cmds:
+      - dagger run python infra/dagger/pipeline.py {{.MODULE}}
