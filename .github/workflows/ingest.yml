@@ -38,6 +38,4 @@ jobs:
           echo "$HOME/.dagger/bin" >> $GITHUB_PATH
 
       - name: Run ingestion pipeline
-        env:
-          DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
         run: dagger run python infra/dagger/pipeline.py boxscore
