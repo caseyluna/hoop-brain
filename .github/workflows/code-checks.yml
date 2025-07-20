@@ -21,7 +21,7 @@ jobs:
         id: set-changes
         run: |
           git fetch origin main
-          CHANGED_FILES=$(git diff --name-only origin/main)
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
           SERVICES=""
           if echo "$CHANGED_FILES" | grep -q '^backend/ingestion-engine/'; then
             SERVICES="$SERVICES ingestion-engine"
@@ -32,6 +32,7 @@ jobs:
           if echo "$CHANGED_FILES" | grep -q '^backend/transformation-engine/'; then
             SERVICES="$SERVICES transformation-engine"
           fi
+          echo "Detected changed services: $SERVICES"
           echo "changed_services=$SERVICES" >> $GITHUB_OUTPUT
 
   code-checks:
@@ -42,8 +43,6 @@ jobs:
         service: [ingestion-engine, model-engine, transformation-engine]
         check: [lint, typecheck, test, coverage]
       fail-fast: false
-
-    if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
 
     steps:
       - name: Checkout repository
@@ -59,5 +58,15 @@ jobs:
           curl -L https://dl.dagger.io/dagger/install.sh | sh
           echo "$HOME/.dagger/bin" >> $GITHUB_PATH
 
+      - name: Check if service changed
+        id: skip
+        run: |
+          if echo "${{ needs.detect-changes.outputs.changed_services }}" | grep -q "${{ matrix.service }}"; then
+            echo "continue=true" >> $GITHUB_OUTPUT
+          else
+            echo "continue=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run ${{ matrix.check }} for ${{ matrix.service }}
+        if: steps.skip.outputs.continue == 'true'
         run: dagger run python infra/dagger/pipeline.py ${{ matrix.check }} ${{ matrix.service }}
