@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: model-engine
+Version: 0.1.0
+Summary: Model engine service
+Requires-Python: >=3.10
+Requires-Dist: dagger-io>=0.18.14
+Requires-Dist: pandas>=2.3.1
+Requires-Dist: pre-commit>=4.2.0
+Requires-Dist: pyright>=1.1.403
+Requires-Dist: pytest>=8.4.1
+Requires-Dist: pytest-cov>=6.2.1
+Requires-Dist: ruff>=0.12.4

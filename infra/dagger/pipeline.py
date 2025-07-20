@@ -1,95 +1,104 @@
 import asyncio
-import os
 import sys
 import time
 
 import dagger
+from rich.console import Console
+from rich.panel import Panel
+
+console = Console()
+
+# === UTILS ===
+
+
+async def pretty_print(service, check, content):
+    header = f"[bold cyan]{service.upper()}[/] | [bold yellow]{check.upper()}[/]"
+    panel = Panel.fit(content.strip(), title=header, border_style="green")
+    console.print(panel)
+
+
+def check_passed(output):
+    # Naive pass/fail detector (customize as needed)
+    if "error" in output.lower() or "failed" in output.lower():
+        return False
+    return True
+
 
 # === ACTION FUNCTIONS ===
 
 
-async def run_lint(ctr):
-    result = await ctr.with_exec(
-        ["uv", "run", "ruff", "format", "--check", "."]
-    ).stdout()
-    print("--- LINT ---\n", result)
-    return result
+async def run_check(ctr, service, check, command):
+    result = await ctr.with_exec(command).stdout()
+    await pretty_print(service, check, result)
+    status = "✅ PASSED" if check_passed(result) else "❌ FAILED"
+    return {"service": service, "check": check, "status": status}
 
 
-async def run_typecheck(ctr):
-    result = await ctr.with_exec(["uv", "run", "ruff", "check", "."]).stdout()
-    print("--- TYPECHECK ---\n", result)
-    return result
-
-
-async def run_test(ctr):
-    result = await ctr.with_exec(["uv", "run", "pytest", "tests"]).stdout()
-    print("--- TESTS ---\n", result)
-    return result
-
-
-async def run_coverage(ctr):
-    result = await ctr.with_exec(
-        ["uv", "run", "pytest", "--cov=src", "--cov-report=term-missing", "tests"]
-    ).stdout()
-    print("--- COVERAGE ---\n", result)
-    return result
-
-
-async def run_all_checks(ctr):
-    results = await asyncio.gather(
-        run_lint(ctr),
-        run_typecheck(ctr),
-        run_test(ctr),
-        run_coverage(ctr),
-    )
-    return results
+async def run_all_checks(ctr, service):
+    tasks = [
+        run_check(
+            ctr, service, "lint", ["uv", "run", "ruff", "format", "--check", "."]
+        ),
+        run_check(ctr, service, "typecheck", ["uv", "run", "ruff", "check", "."]),
+        run_check(ctr, service, "test", ["uv", "run", "pytest", "tests"]),
+        run_check(
+            ctr,
+            service,
+            "coverage",
+            ["uv", "run", "pytest", "--cov=src", "--cov-report=term-missing", "tests"],
+        ),
+    ]
+    return await asyncio.gather(*tasks)
 
 
 # === MAIN ENTRY POINT ===
 
 
 async def main():
-    action = sys.argv[1] if len(sys.argv) > 1 else "all"
+    action = sys.argv[1] if len(sys.argv) > 1 else "all-checks"
     service = sys.argv[2] if len(sys.argv) > 2 else "ingestion-engine"
     force_rebuild = "--force-rebuild" in sys.argv
 
-    # Set project root relative to this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # go up two levels: infra/dagger -> infra/ -> hoop-brain/
-    project_root = os.path.abspath(os.path.join(script_dir, "../.."))
-
-    # build service path relative to project root
-    base_path = os.path.join(project_root, "backend")
-    service_path = os.path.join(base_path, service)
-
-    print("Project root:", project_root)
-    print("Service path:", service_path)
+    base_path = "backend"
+    service_path = f"{base_path}/{service}"
 
     async with dagger.Connection() as client:
-        build_args = (
-            [dagger.BuildArg(name="CACHEBUSTER", value=str(time.time()))]
-            if force_rebuild
-            else []
-        )
-        print("Build args: ", build_args)
         build = client.container().build(
             context=client.host().directory(service_path),
             dockerfile="Dockerfile",
-            build_args=build_args,
         )
+
+        if force_rebuild:
+            build = build.with_env_variable("CACHE_BUST", str(time.time()))
 
         ctr = build.with_mounted_directory(
             "/app", client.host().directory(service_path)
         ).with_workdir("/app")
 
         actions = {
-            "lint": run_lint,
-            "typecheck": run_typecheck,
-            "test": run_test,
-            "coverage": run_coverage,
-            "all": run_all_checks,
+            "lint": lambda c: run_check(
+                c, service, "lint", ["uv", "run", "ruff", "format", "--check", "."]
+            ),
+            "typecheck": lambda c: run_check(
+                c, service, "typecheck", ["uv", "run", "ruff", "check", "."]
+            ),
+            "test": lambda c: run_check(
+                c, service, "test", ["uv", "run", "pytest", "tests"]
+            ),
+            "coverage": lambda c: run_check(
+                c,
+                service,
+                "coverage",
+                [
+                    "uv",
+                    "run",
+                    "pytest",
+                    "--cov=src",
+                    "--cov-report=term-missing",
+                    "tests",
+                ],
+            ),
+            "all-checks": lambda c: run_all_checks(c, service),
         }
 
         if action not in actions:
@@ -97,7 +106,15 @@ async def main():
                 f"Unknown action: {action}. Choose from: {', '.join(actions.keys())}"
             )
 
-        await actions[action](ctr)
+        results = await actions[action](ctr)
+
+        # Collect and print summary
+        summary = results if isinstance(results, list) else [results]
+        console.rule("[bold magenta]Summary[/bold magenta]")
+        for item in summary:
+            console.print(
+                f"[cyan]{item['service']}[/] | [yellow]{item['check']}[/]: {item['status']}"
+            )
 
 
 if __name__ == "__main__":

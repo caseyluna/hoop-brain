@@ -1,12 +1,18 @@
+version: "3"
+
 tasks:
-  ingestion:all:
+  ingestion:all-checks:
     desc: Run all checks for ingestion-engine
     cmds:
-      - task --dir backend/ingestion-engine all
+      - (cd backend/ingestion-engine && task all-checks)
 
-  all:code-checks:
-    desc: Run all services' checks
+  model:all-checks:
+    desc: Run all checks for model-engine
     cmds:
-      - task ingestion:all
-      - task model:all
-      - task dbt:all
+      - (cd backend/model-engine && task all-checks)
+
+  all-checks:
+    desc: Run all checks sequentially across all services
+    cmds:
+      - task ingestion:all-checks
+      - task model:all-checks

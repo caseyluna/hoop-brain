@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  SERVICE_NAME: ingestion-engine
+  SERVICE_NAME: model-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
   DAGGER_SCRIPT: "infra/dagger/pipeline.py"
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
