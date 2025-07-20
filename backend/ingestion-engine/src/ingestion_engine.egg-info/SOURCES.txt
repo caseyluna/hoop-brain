@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+src/app.py
+src/ingestion_engine.egg-info/PKG-INFO
+src/ingestion_engine.egg-info/SOURCES.txt
+src/ingestion_engine.egg-info/dependency_links.txt
+src/ingestion_engine.egg-info/requires.txt
+src/ingestion_engine.egg-info/top_level.txt
+tests/test_app.py

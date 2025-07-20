@@ -1,0 +1,63 @@
+name: Code Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed_services: ${{ steps.set-changes.outputs.changed_services }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: set-changes
+        run: |
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main)
+          SERVICES=""
+          if echo "$CHANGED_FILES" | grep -q '^backend/ingestion-engine/'; then
+            SERVICES="$SERVICES ingestion-engine"
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^backend/model-engine/'; then
+            SERVICES="$SERVICES model-engine"
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^backend/transformation-engine/'; then
+            SERVICES="$SERVICES transformation-engine"
+          fi
+          echo "changed_services=$SERVICES" >> $GITHUB_OUTPUT
+
+  code-checks:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ingestion-engine, model-engine, transformation-engine]
+        check: [lint, typecheck, test, coverage]
+      fail-fast: false
+
+    if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Dagger CLI
+        run: |
+          curl -L https://dl.dagger.io/dagger/install.sh | sh
+          echo "$HOME/.dagger/bin" >> $GITHUB_PATH
+
+      - name: Run ${{ matrix.check }} for ${{ matrix.service }}
+        run: dagger run python infra/dagger/pipeline.py ${{ matrix.check }} ${{ matrix.service }}

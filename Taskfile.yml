@@ -1,9 +1,12 @@
-version: "3"
-
 tasks:
-  ingest:
-    desc: Run ingestion pipeline via Dagger
-    vars:
-      MODULE: boxscore
+  ingestion:all:
+    desc: Run all checks for ingestion-engine
     cmds:
-      - dagger run python infra/dagger/pipeline.py {{.MODULE}}
+      - task --dir backend/ingestion-engine all
+
+  all:code-checks:
+    desc: Run all services' checks
+    cmds:
+      - task ingestion:all
+      - task model:all
+      - task dbt:all

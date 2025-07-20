@@ -1,0 +1,27 @@
+[project]
+name = "ingestion-engine"
+version = "0.1.0"
+description = "Ingestion engine service"
+requires-python = ">=3.10"
+dependencies = [
+    "dagger-io>=0.18.14",
+    "pandas>=2.3.1",
+    "pre-commit>=4.2.0",
+    "pyright>=1.1.403",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "ruff>=0.12.4",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.9.2",
+    "pre-commit>=4.2.0",
+]
