@@ -3,9 +3,8 @@ version: "3"
 vars:
   SERVICE_NAME: model-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_SCRIPT: "infra/dagger/pipeline.py"
+  DAGGER_RUN: "dagger run python infra/dagger/run_ci_pipeline.py"
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
-  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
 tasks:
   # === Build + Dev Shell ===
@@ -30,42 +29,32 @@ tasks:
 
   # === Dagger Checks ===
 
-  lint:
-    desc: Run lint via Dagger
+  all-checks:
+    desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} lint {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}}"
+
+  lint:
+    desc: Run lint check for {{.SERVICE_NAME}}
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} lint {{.SERVICE_NAME}}"
 
   typecheck:
-    desc: Run typecheck via Dagger
+    desc: Run typecheck for {{.SERVICE_NAME}}
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} typecheck {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} typecheck {{.SERVICE_NAME}}"
 
   test:
-    desc: Run tests via Dagger
+    desc: Run tests for {{.SERVICE_NAME}}
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} test {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} test {{.SERVICE_NAME}}"
 
   coverage:
-    desc: Run test coverage via Dagger
+    desc: Run test coverage for {{.SERVICE_NAME}}
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} coverage {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
-
-  all-checks:
-    desc: Run all Dagger checks in parallel (recommended for CI)
-    dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
-    cmds:
-      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} coverage {{.SERVICE_NAME}}"

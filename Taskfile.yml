@@ -1,23 +1,25 @@
 version: "3"
 
+vars:
+  DAGGER_SCRIPT: "infra/dagger/run_ci_pipeline.py"
+  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+
+includes:
+  ingestion:
+    taskfile: ./backend/ingestion-engine/Taskfile.yml
+    dir: ./backend/ingestion-engine
+
+  model:
+    taskfile: ./backend/model-engine/Taskfile.yml
+    dir: ./backend/model-engine
+
+  transformation:
+    taskfile: ./backend/transformation-engine/Taskfile.yml
+    dir: ./backend/transformation-engine
+
 tasks:
-  ingestion:all-checks:
-    desc: Run all checks for ingestion-engine
-    cmds:
-      - (cd backend/ingestion-engine && task all-checks)
-
-  model:all-checks:
-    desc: Run all checks for model-engine
-    cmds:
-      - (cd backend/model-engine && task all-checks)
-
-  transformation:all-checks:
-    desc: Run all checks for transformation-engine (dbt)
-    cmds:
-      - (cd backend/transformation-engine && task all-checks)
-
   all-checks:
-    desc: Run all checks sequentially across all services
+    desc: Run all checks on all services sequentially
     cmds:
       - task ingestion:all-checks
       - task model:all-checks

@@ -3,7 +3,7 @@ version: "3"
 vars:
   SERVICE_NAME: transformation-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_SCRIPT: "infra/dagger/pipeline.py"
+  DAGGER_SCRIPT: "infra/dagger/run_ci_pipeline.py"
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
@@ -30,34 +30,32 @@ tasks:
 
   # === Dagger Checks ===
 
-  compile:
-    desc: Run dbt compile via Dagger
+  dbt-parse:
+    desc: Run dbt parse via Dagger
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} compile {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} dbt-parse {{.SERVICE_NAME}}"
 
-  run:
-    desc: Run dbt run via Dagger
+  dbt-deps:
+    desc: Run dbt deps via Dagger
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} run {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} dbt-deps {{.SERVICE_NAME}}"
 
-  test:
+  dbt-test:
     desc: Run dbt test via Dagger
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} test {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} dbt-test {{.SERVICE_NAME}}"
+
+  dbt-build:
+    desc: Run dbt build via Dagger
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} dbt-build {{.SERVICE_NAME}}"
 
   all-checks:
-    desc: Run all dbt checks in parallel via Dagger
+    desc: Run all Dagger checks in parallel (recommended for CI)
     dir: ../..
-    vars:
-      DAGGER_FORCE_REBUILD: '{{if eq .FORCE_REBUILD "true"}}--force-rebuild{{end}}'
     cmds:
-      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}} {{.DAGGER_FORCE_REBUILD}}"
+      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}}"
