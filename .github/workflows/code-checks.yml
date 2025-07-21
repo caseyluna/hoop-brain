@@ -22,18 +22,18 @@ jobs:
         run: |
           git fetch origin main
           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
-          SERVICES=""
+          SERVICES=()
           if echo "$CHANGED_FILES" | grep -q '^backend/ingestion-engine/'; then
-            SERVICES="$SERVICES ingestion-engine"
+            SERVICES+=("ingestion-engine")
           fi
           if echo "$CHANGED_FILES" | grep -q '^backend/model-engine/'; then
-            SERVICES="$SERVICES model-engine"
+            SERVICES+=("model-engine")
           fi
           if echo "$CHANGED_FILES" | grep -q '^backend/transformation-engine/'; then
-            SERVICES="$SERVICES transformation-engine"
+            SERVICES+=("transformation-engine")
           fi
-          echo "Detected changed services: $SERVICES"
-          echo "changed_services=$SERVICES" >> $GITHUB_OUTPUT
+          echo "Detected changed services: ${SERVICES[*]}"
+          echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
 
   code-checks:
     needs: detect-changes
@@ -41,7 +41,13 @@ jobs:
     strategy:
       matrix:
         service: [ingestion-engine, model-engine, transformation-engine]
-        check: [lint, typecheck, test, coverage]
+        include:
+          - service: ingestion-engine
+            checks: "lint typecheck test coverage"
+          - service: model-engine
+            checks: "lint typecheck test coverage"
+          - service: transformation-engine
+            checks: "dbt-parse dbt-deps dbt-test dbt-build"
       fail-fast: false
 
     steps:
@@ -58,15 +64,10 @@ jobs:
           curl -L https://dl.dagger.io/dagger/install.sh | sh
           echo "$HOME/.dagger/bin" >> $GITHUB_PATH
 
-      - name: Check if service changed
-        id: skip
+      - name: Run checks for ${{ matrix.service }}
+        if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
         run: |
-          if echo "${{ needs.detect-changes.outputs.changed_services }}" | grep -q "${{ matrix.service }}"; then
-            echo "continue=true" >> $GITHUB_OUTPUT
-          else
-            echo "continue=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run ${{ matrix.check }} for ${{ matrix.service }}
-        if: steps.skip.outputs.continue == 'true'
-        run: dagger run python infra/dagger/pipeline.py ${{ matrix.check }} ${{ matrix.service }}
+          for check in ${{ matrix.checks }}; do
+            echo "🔧 Running $check for ${{ matrix.service }}"
+            dagger run python infra/dagger/run_ci_pipeline.py $check ${{ matrix.service }}
+          done
