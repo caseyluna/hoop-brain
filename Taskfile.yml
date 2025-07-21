@@ -11,8 +11,14 @@ tasks:
     cmds:
       - (cd backend/model-engine && task all-checks)
 
+  transformation:all-checks:
+    desc: Run all checks for transformation-engine (dbt)
+    cmds:
+      - (cd backend/transformation-engine && task all-checks)
+
   all-checks:
     desc: Run all checks sequentially across all services
     cmds:
       - task ingestion:all-checks
       - task model:all-checks
+      - task transformation:all-checks

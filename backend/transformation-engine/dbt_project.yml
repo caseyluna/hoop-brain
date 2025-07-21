@@ -1,0 +1,13 @@
+name: transformation_engine
+version: "1.0"
+config-version: 2
+
+profile: transformation_engine
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+  transformation_engine:
+    +materialized: view

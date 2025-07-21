@@ -1,0 +1,5 @@
+# Ignore sensitive keys + compiled dbt artifacts
+keys/service_account.json
+dbt_modules/
+target/
+profiles/
