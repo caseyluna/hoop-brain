@@ -18,7 +18,11 @@ tasks:
     desc: Start an interactive shell inside the local Docker container
     deps: [build]
     cmds:
-      - docker run --rm -it -v $PWD:/app {{.IMAGE_NAME}} /bin/bash
+      - >
+        docker run --rm -it
+        -v $PWD:/app
+        -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
+        {{.IMAGE_NAME}} /bin/bash
 
   # === Precommit + CI ===
 
