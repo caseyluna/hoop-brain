@@ -1,0 +1,6 @@
+pipelines:
+  ci-all:
+    services:
+      - ingestion-engine
+      - sync-engine
+    order: sequential
