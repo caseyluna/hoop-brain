@@ -1,4 +1,4 @@
-app
 core
 health
+main
 modules

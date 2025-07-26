@@ -1,0 +1,18 @@
+[project]
+name = "sync-engine"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "db-dtypes>=1.4.2",
+    "google-cloud-bigquery>=3.30.0",
+    "ipython>=8.12.3",
+    "loguru>=0.7.3",
+    "pandas>=2.0.3",
+    "polars>=1.8.2",
+    "psycopg2-binary>=2.9.10",
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.2",
+    "sqlalchemy>=2.0.41",
+]

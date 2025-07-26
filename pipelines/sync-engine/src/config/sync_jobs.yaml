@@ -1,0 +1,4 @@
+bq_to_postgres:
+  - bq_view: test.view_teams
+    pg_table: teams
+    primary_key: id
