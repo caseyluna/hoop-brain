@@ -6,16 +6,16 @@ vars:
 
 includes:
   ingestion:
-    taskfile: ./backend/ingestion-engine/Taskfile.yml
-    dir: ./backend/ingestion-engine
+    taskfile: ./pipelines/ingestion-engine/Taskfile.yml
+    dir: ./pipelines/ingestion-engine
 
   model:
-    taskfile: ./backend/model-engine/Taskfile.yml
-    dir: ./backend/model-engine
+    taskfile: ./pipelines/model-engine/Taskfile.yml
+    dir: ./pipelines/model-engine
 
   transformation:
-    taskfile: ./backend/transformation-engine/Taskfile.yml
-    dir: ./backend/transformation-engine
+    taskfile: ./pipelines/transformation-engine/Taskfile.yml
+    dir: ./pipelines/transformation-engine
 
 tasks:
   all-checks:

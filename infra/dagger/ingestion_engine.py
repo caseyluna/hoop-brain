@@ -6,7 +6,7 @@ async def run_main_py(client: dagger.Client, service: str = "ingestion-engine") 
     """
     Build the ingestion-engine container and run main.py inside.
     """
-    service_path = f"backend/{service}"
+    service_path = f"pipelines/{service}"
 
     container = (
         client.container()

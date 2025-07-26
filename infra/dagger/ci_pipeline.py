@@ -30,7 +30,7 @@ class CIPipeline:
         Prepare Dagger containers for each service
         """
         for service in self.services:
-            service_path = f"backend/{service}"
+            service_path = f"pipelines/{service}"
             container = self.client.container().build(
                 context=self.client.host().directory(service_path),
                 dockerfile="Dockerfile",
