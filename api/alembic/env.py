@@ -2,14 +2,12 @@ import os
 import sys
 from logging.config import fileConfig
 
-from dotenv import load_dotenv
 from sqlalchemy import create_engine, pool
 
 from alembic import context
 from app.db.base import Base
 
-load_dotenv()
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "app"))
 
 
 # this is the Alembic Config object, which provides

@@ -18,24 +18,39 @@ services:
     build:
       context: ./api
     container_name: hoopbrain-api
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - ./api:/api
     env_file:
       - ./api/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hoopbrain
+      - PYTHONPATH=/app
     ports:
       - "8000:8000"
     depends_on:
       - postgres
+    networks:
+      - hoopbrain
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: hoopbrain-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hoopbrain
+      - NODE_ENV=development
+    command: npm run dev
+    depends_on:
+      - api
     networks:
       - hoopbrain
 
   sync-engine:
     build:
       context: ./pipelines/sync-engine
-      dockerfile: Dockerfile
     container_name: sync-engine
     volumes:
       - ./pipelines/sync-engine:/app
