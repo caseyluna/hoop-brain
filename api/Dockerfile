@@ -1,27 +1,29 @@
-# use slim python base image
+# api/Dockerfile
+
 FROM python:3.11-slim
 
-# install uv
+# Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.4.9 /uv /bin/uv
 
-# set workdir
 WORKDIR /app
 
-# copy dependency files
-COPY pyproject.toml ./
-COPY uv.lock ./
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
-# copy code
-COPY . /app
-
+# Set envs
 ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app"
 
-# install deps with uv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+RUN uv sync
 
-# expose port for FASTAPI
+# Copy code
+COPY ./app ./app
+
+COPY ./alembic ./alembic
+COPY ./alembic.ini ./alembic.ini
+
+# Expose FastAPI port
 EXPOSE 8000
 
-# default command
+# Start app
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
