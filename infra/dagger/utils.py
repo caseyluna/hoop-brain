@@ -1,3 +1,5 @@
+# infra/dagger/utils.py
+
 import re
 from typing import Any, Dict, List
 
@@ -7,11 +9,11 @@ from rich.panel import Panel
 console = Console()
 
 
-async def pretty_print(service: str, check: str, content: str) -> None:
+async def pretty_print(service: str, action: str, content: str) -> None:
     """
-    Pretty print the output of a check with rich panels.
+    Pretty print the output of a check or job with rich panels.
     """
-    header = f"[bold yellow]{check.upper()}[/]"
+    header = f"[bold yellow]{action.upper()}[/]"
     panel = Panel.fit(content.strip(), title=header, border_style="green")
     console.print(panel)
 
@@ -42,7 +44,6 @@ def check_passed(output: str) -> bool:
         if "warning: no packages were found" in lower_output:
             return True
         if "performance info" in lower_output and "error" not in lower_output:
-            # dbt parse success fallback
             return True
         return False
 
@@ -72,12 +73,18 @@ def check_passed(output: str) -> bool:
 
 def print_ci_summary(results: List[Dict[str, Any]], total_time: float) -> None:
     """
-    Print a summary of all CI checks.
+    Print a summary of all CI checks/jobs.
     """
     console.rule("[bold magenta]CI Summary[/bold magenta]")
     for r in results:
-        console.print(
-            f"[cyan]{r['service']}[/] | [yellow]{r['check']}[/]: {r['status']} "
-            f"⏱ {r['elapsed']:.2f}s"
-        )
+        if "check" in r:
+            console.print(
+                f"[cyan]{r['service']}[/] | [yellow]{r['check']}[/]: {r['status']} "
+                f"⏱ {r['elapsed']:.2f}s"
+            )
+        elif "job" in r:
+            console.print(
+                f"[cyan]{r['service']}[/] | [yellow]{r['job']}[/]: {r['status']} "
+                f"⏱ {r['elapsed']:.2f}s"
+            )
     console.print(f"\n🔥 Total CI time: {total_time:.2f}s\n")

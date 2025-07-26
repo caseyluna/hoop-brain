@@ -1,0 +1,71 @@
+services:
+  ingestion-engine:
+    type: python
+    src_dir: pipelines/ingestion-engine
+    checks:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=ingestion_engine",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
+    jobs:
+      run-main: ["uv", "run", "python", "src/main.py"]
+  model-engine:
+    type: python
+    src_dir: pipelines/model-engine
+    checks:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=model_engine",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
+    jobs:
+      run-main: ["uv", "run", "python", "src/main.py"]
+
+  sync-engine:
+    type: python
+    src_dir: pipelines/sync-engine
+    checks:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=sync_engine",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
+    jobs:
+      run-main: ["uv", "run", "python", "src/main.py"]
+
+  transformation-engine:
+    type: dbt
+    src_dir: pipelines/transformation-engine
+    checks:
+      dbt-parse: ["dbt", "parse", "--profiles-dir", "/app/profiles"]
+      dbt-deps: ["dbt", "parse", "--profiles-dir", /app/profiles"]
+      dbt-test: ["dbt", "test", "--profiles-dir", /app/profiles"]
+      dbt-build: ["dbt", "build", "--profiles-dir", /app/profiles"]
+    jobs:
+      run-dbt-build: ["dbt", "build", "--profiles-dir", "/app/profiles"]
+
+  fastapi:
+  frontend-app:
+  postgres:
