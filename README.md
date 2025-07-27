@@ -4,7 +4,7 @@ when you create a new table in the db you also have to run alembic in the api se
 
 TODOs:
 
-- Fix GHA so I can merge to main
+- Fix GHA so I can merge to main almost
 - Clean up API and front end code - make it clearer where to add stuff
 - Automate adding new tables and alembic migrations
 - Finish constructing the Dagger code

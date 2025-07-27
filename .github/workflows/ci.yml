@@ -29,27 +29,26 @@ jobs:
       - name: Configure GCP credentials
         run: |
           mkdir -p keys
-          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
-            printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
-          else
-            touch keys/service_account.json
-          fi
+          printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
 
-      - name: Generate DBT profiles
+      - name: Ensure DBT profiles (transformation-engine only)
+        if: ${{ matrix.service == 'transformation-engine' }}
         run: |
           mkdir -p pipelines/transformation-engine/profiles
-          echo "default:" > pipelines/transformation-engine/profiles/profiles.yml
-          echo "  outputs:" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "    dev:" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      type: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      threads: 1" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      host: db" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      port: 5432" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      user: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      pass: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      dbname: hoopbrain_test" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      schema: public" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "  target: dev" >> pipelines/transformation-engine/profiles/profiles.yml
+          cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
+          transformation_engine:
+            outputs:
+              dev:
+                type: postgres
+                threads: 1
+                host: db
+                port: 5432
+                user: postgres
+                pass: postgres
+                dbname: hoopbrain_test
+                schema: public
+            target: dev
+          EOF
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -79,17 +78,14 @@ jobs:
             uv sync
           fi
 
-      - name: List files for debugging
-        run: ls -lR
-
       - name: Run ${{ matrix.service }} pipeline
-        run: |
-          dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
 
   integration-test:
     name: Integration Test
-    runs-on: ubuntu-latest
     needs: service-ci
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -97,27 +93,25 @@ jobs:
       - name: Configure GCP credentials
         run: |
           mkdir -p keys
-          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
-            printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
-          else
-            touch keys/service_account.json
-          fi
+          printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
 
-      - name: Generate DBT profiles
+      - name: Ensure DBT profiles
         run: |
           mkdir -p pipelines/transformation-engine/profiles
-          echo "default:" > pipelines/transformation-engine/profiles/profiles.yml
-          echo "  outputs:" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "    dev:" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      type: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      threads: 1" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      host: db" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      port: 5432" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      user: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      pass: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      dbname: hoopbrain_test" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "      schema: public" >> pipelines/transformation-engine/profiles/profiles.yml
-          echo "  target: dev" >> pipelines/transformation-engine/profiles/profiles.yml
+          cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
+          transformation_engine:
+            outputs:
+              dev:
+                type: postgres
+                threads: 1
+                host: db
+                port: 5432
+                user: postgres
+                pass: postgres
+                dbname: hoopbrain_test
+                schema: public
+            target: dev
+          EOF
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -133,9 +127,5 @@ jobs:
             | tar -xz dagger
           sudo mv dagger /usr/local/bin/
 
-      - name: List files for debugging
-        run: ls -lR
-
       - name: Run Integration Test pipeline
-        run: |
-          dagger run python infra/dagger/cli.py integration-test
+        run: dagger run python infra/dagger/cli.py integration-test
