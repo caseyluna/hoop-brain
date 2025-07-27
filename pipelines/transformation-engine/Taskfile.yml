@@ -6,50 +6,66 @@ vars:
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
 tasks:
+  default:
+    desc: Run all dbt-related checks for this service
+    cmds:
+      - task: all-checks
+
   parse:
     desc: Run dbt parse to validate project structure
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-parse"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-parse {{.CLI_ARGS}}"
 
   deps:
     desc: Install dbt dependencies
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-deps"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-deps {{.CLI_ARGS}}"
 
   build:
     desc: Run dbt build (models + tests)
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-build"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-build {{.CLI_ARGS}}"
 
   test:
     desc: Run dbt test (models with tests only)
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-test"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-test {{.CLI_ARGS}}"
 
   all-checks:
     desc: Run all dbt-related checks for this service in parallel
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}} {{.CLI_ARGS}}"
 
   run-dbt-build:
     desc: Run job defined in services.yaml (typically same as build)
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-dbt-build"
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-dbt-build {{.CLI_ARGS}}"
 
   job:
-    desc: Run a custom job (e.g. task job -- run-dbt-build)
+    desc: Run a custom job (usage task job -- run-dbt-build)
     dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"
 
+  debug:
+    desc: Run all checks with debug tracebacks
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}} --debug {{.CLI_ARGS}}"
+
+  help:
+    desc: Show CLI help for this service
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} --help"
+
   precommit:
     desc: Run pre-commit hooks
-    dir: ../..
     cmds:
       - pre-commit run --all-files

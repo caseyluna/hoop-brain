@@ -3,6 +3,11 @@ FROM python:3.13-slim
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.4.9 /uv /bin/uv
+RUN apt-get update && \
+  apt-get install -y \
+  postgresql-client \
+  bash \
+  && rm -rf /var/lib/apt/lists/*
 
 # Set environment variables for uv and ensure .venv/bin is in PATH
 ENV UV_COMPILE_BYTECODE=1 \
@@ -23,6 +28,7 @@ COPY ./app ./app
 COPY ./alembic ./alembic
 COPY ./alembic.ini ./alembic.ini
 COPY ./tests ./tests
+COPY ./scripts ./scripts
 
 
 EXPOSE 8000

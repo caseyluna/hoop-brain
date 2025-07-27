@@ -37,7 +37,7 @@ class BQToPostgresJob(BaseJob):
         df = self._read_from_bq()
         tmp_table = f"{self.pg_table}_tmp"
 
-        self._write_to_postgres(df, tmp_table)
+        self.write_to_postgres(df, tmp_table)
         self._atomic_swap(tmp_table)
 
         logger.info(f"Synced {len(df)} rows from {self.bq_view} -> {self.pg_table}")
@@ -49,7 +49,7 @@ class BQToPostgresJob(BaseJob):
         logger.info(f"Retrieved {len(result)} rows from BQ view `{self.bq_view}`")
         return pl.from_pandas(result)
 
-    def _write_to_postgres(self, df: pl.DataFrame, tmp_table: str) -> None:
+    def write_to_postgres(self, df: pl.DataFrame, tmp_table: str) -> None:
         logger.info(f"Writing {len(df)} rows to temporary Postgres table `{tmp_table}`")
         with self.pg_engine.begin() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {tmp_table}"))

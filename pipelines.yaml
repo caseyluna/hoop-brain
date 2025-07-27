@@ -1,6 +1,11 @@
 # pipelines.yaml
 pipelines:
+  test-api:
+    steps:
+      - api: [migrate-test]
+      - sync-engine: [run-main]
   ci-all:
+    description: "Run all checks for all services in parallel"
     services:
       - ingestion-engine
       - transformation-engine
@@ -11,6 +16,7 @@ pipelines:
     order: parallel
 
   ci-backend:
+    description: "Run all checks for backend services"
     services:
       - ingestion-engine
       - transformation-engine
@@ -20,11 +26,13 @@ pipelines:
     order: parallel
 
   ci-frontend:
+    description: "Run all checks for frontend"
     services:
       - web
     order: parallel
 
   test-all:
+    description: "Run all test checks for all services"
     steps:
       - ingestion-engine: [test]
       - transformation-engine: [test]
@@ -34,6 +42,7 @@ pipelines:
       - web: [test]
 
   build-all:
+    description: "Run build for all services that support it"
     steps:
       - ingestion-engine: [build]
       - transformation-engine: [build]
@@ -41,3 +50,13 @@ pipelines:
       - sync-engine: [build]
       - api: [build]
       - web: [build]
+
+  lint-all:
+    description: "Run lint for all services"
+    steps:
+      - ingestion-engine: [lint]
+      - transformation-engine: [lint]
+      - model-engine: [lint]
+      - sync-engine: [lint]
+      - api: [lint]
+      - web: [lint]

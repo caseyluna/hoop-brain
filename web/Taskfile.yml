@@ -39,7 +39,7 @@ tasks:
   # run all checks via dagger
   all-checks:
     desc: Run all checks for {{.SERVICE_NAME}} via Dagger
-    dir: ../..
+    dir: ..
     cmds:
       - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
 

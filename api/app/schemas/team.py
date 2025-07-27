@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Team(BaseModel):
@@ -10,5 +10,4 @@ class Team(BaseModel):
     state: str
     year_founded: int
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

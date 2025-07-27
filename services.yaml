@@ -3,29 +3,40 @@ services:
   api:
     type: fastapi
     src_dir: api
+    description: "Main FastAPI backend"
+    dependencies: [db, sync-engine]
     checks:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
-      test: ["sh", "-c", "uv run alembic upgrade head && uv run pytest tests"]
     jobs:
       run-main:
         ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-      alembic-upgrade: ["uv", "run", "alembic", "upgrade", "head"]
-      alembic-revision: ["alembic", "revision", "--autogenerate", "-m"]
+  db:
+    type: postgres
+    src_dir: db/postgres
+    description: "Postgres database"
+    dependencies: []
+    checks: {}
+    jobs: {}
 
   web:
     type: react
     src_dir: web
+    description: "Frontend React app"
+    dependencies: []
     checks:
       lint: ["npm", "run", "lint"]
       typecheck: ["npm", "run", "typecheck"]
       build: ["npm", "run", "build"]
+      test: ["npm", "run", "test"]
     jobs:
       dev: ["npm", "run", "dev"]
 
   ingestion-engine:
     type: python
     src_dir: pipelines/ingestion-engine
+    description: "Ingestion engine"
+    dependencies: []
     checks:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
@@ -45,6 +56,8 @@ services:
   model-engine:
     type: python
     src_dir: pipelines/model-engine
+    description: "Model engine"
+    dependencies: []
     checks:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
@@ -64,6 +77,8 @@ services:
   sync-engine:
     type: python
     src_dir: pipelines/sync-engine
+    description: "Sync engine"
+    dependencies: [db]
     checks:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
@@ -83,9 +98,11 @@ services:
   transformation-engine:
     type: dbt
     src_dir: pipelines/transformation-engine
+    description: "DBT transformation engine"
+    dependencies: []
     checks:
       dbt-parse: ["dbt", "parse", "--profiles-dir", "/app/profiles"]
-      dbt-deps: ["dbt", "parse", "--profiles-dir", "/app/profiles"]
+      dbt-deps: ["dbt", "deps", "--profiles-dir", "/app/profiles"]
       dbt-test: ["dbt", "test", "--profiles-dir", "/app/profiles"]
       dbt-build: ["dbt", "build", "--profiles-dir", "/app/profiles"]
     jobs:

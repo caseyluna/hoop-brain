@@ -3,6 +3,7 @@ version: "3"
 vars:
   DAGGER_SCRIPT: "infra/dagger/cli.py"
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+  ENV_FILE: .env.test
 
 includes:
   ingestion:
@@ -12,6 +13,10 @@ includes:
   model:
     taskfile: ./pipelines/model-engine/Taskfile.yml
     dir: ./pipelines/model-engine
+
+  sync:
+    taskfile: ./pipelines/sync-engine/Taskfile.yml
+    dir: ./pipelines/sync-engine
 
   transformation:
     taskfile: ./pipelines/transformation-engine/Taskfile.yml
@@ -47,3 +52,27 @@ tasks:
     desc: Run frontend CI pipeline
     cmds:
       - "{{.DAGGER_RUN}} ci-frontend"
+  lint:
+    desc: Run lint-all pipeline
+    cmds:
+      - "{{.DAGGER_RUN}} lint-all"
+  test:
+    desc: Run test-all pipeline
+    cmds:
+      - "{{.DAGGER_RUN}} test-all"
+  build:
+    desc: Run build-all pipeline
+    cmds:
+      - "{{.DAGGER_RUN}} build-all"
+  pipeline:
+    desc: Run a named pipeline (task pipeline -- pipeline_name)
+    cmds:
+      - "{{.DAGGER_RUN}} {{.CLI_ARGS}}"
+  integration-test:
+    desc: Run full integration test (migrate, populate, test api)
+    cmds:
+      - |
+        set -a
+        source {{.ENV_FILE}}
+        set +a
+        {{.DAGGER_RUN}} integration-test

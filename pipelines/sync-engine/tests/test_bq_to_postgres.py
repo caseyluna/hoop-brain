@@ -2,7 +2,7 @@ import polars as pl
 import pytest
 from sqlalchemy import create_engine, inspect
 
-from jobs.bq_to_postgres import BQToPostgresJob
+from src.jobs.bq_to_postgres import BQToPostgresJob
 
 
 @pytest.fixture()

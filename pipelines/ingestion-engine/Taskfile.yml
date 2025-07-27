@@ -8,6 +8,11 @@ vars:
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
 
 tasks:
+  default:
+    desc: Run all CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: all-checks
+
   # build local container
   build:
     desc: Build local Docker container
@@ -36,31 +41,31 @@ tasks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}} {{.CLI_ARGS}}"
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint {{.CLI_ARGS}}"
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck {{.CLI_ARGS}}"
 
   test:
     desc: Run tests for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test {{.CLI_ARGS}}"
 
   coverage:
     desc: Run test coverage for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} coverage"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} coverage {{.CLI_ARGS}}"
 
   # run job
   job:

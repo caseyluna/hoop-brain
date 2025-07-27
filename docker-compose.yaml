@@ -1,9 +1,11 @@
 services:
-  postgres:
+  db:
     build:
       context: ./db/postgres
     container_name: hoopbrain-postgres
     restart: always
+    env_file:
+      - .env.test
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -25,15 +27,19 @@ services:
       - PYTHONPATH=/app
     ports:
       - "8000:8000"
+    volumes:
+      - ./api/alembic/versions:/app/alembic/versions
     depends_on:
-      - postgres
+      - db
     networks:
       - hoopbrain
 
   web:
     build:
       context: ./web
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.test
     container_name: hoopbrain-web
     ports:
       - "5173:5173"
@@ -52,13 +58,13 @@ services:
     build:
       context: ./pipelines/sync-engine
     container_name: sync-engine
+    env_file:
+      - .env.test
     volumes:
       - ./pipelines/sync-engine:/app
       - /Users/caseythayer/projects/hoop-brain/keys:/keys:ro
-    env_file:
-      - ./pipelines/sync-engine/.env
     depends_on:
-      - postgres
+      - db
     working_dir: /app
     entrypoint: ["/bin/bash"]
     stdin_open: true

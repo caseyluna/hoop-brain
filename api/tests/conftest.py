@@ -7,9 +7,9 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 
+os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL", "test")
+
 
 @pytest.fixture(scope="session")
 def client():
-    # Ensure DATABASE_URL is set before importing app/db code
-    os.getenv("DATABASE_URL")
     return TestClient(app)

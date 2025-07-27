@@ -5,6 +5,7 @@ vars:
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
   DAGGER_SCRIPT: infra/dagger/cli.py
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+  ENV_FILE: .env.test
 
 tasks:
   build:
@@ -37,10 +38,14 @@ tasks:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
 
   test:
-    desc: Run tests for {{.SERVICE_NAME}}
+    desc: Run revisions, migrate, populate DB, run API tests
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
+      - |
+        set -a
+        source {{.ENV_FILE}}
+        set +a
+        {{.DAGGER_RUN}} test-api
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
