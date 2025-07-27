@@ -1,4 +1,4 @@
-name: Dagger CI
+name: CI
 
 on:
   push:
@@ -7,89 +7,58 @@ on:
     branches: [main]
 
 jobs:
-  detect-changes:
-    runs-on: ubuntu-latest
-    outputs:
-      changed_services: ${{ steps.set-changes.outputs.changed_services }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Detect changed services
-        id: set-changes
-        run: |
-          git fetch origin main || true
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD || echo "")
-
-          SERVICES=()
-          if echo "$CHANGED_FILES" | grep -q '^api/'; then
-            SERVICES+=("api")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^web/'; then
-            SERVICES+=("web")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^pipelines/sync-engine/'; then
-            SERVICES+=("sync-engine")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^pipelines/ingestion-engine/'; then
-            SERVICES+=("ingestion-engine")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^pipelines/model-engine/'; then
-            SERVICES+=("model-engine")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^pipelines/transformation-engine/'; then
-            SERVICES+=("transformation-engine")
-          fi
-
-          echo "Detected changed services: ${SERVICES[*]}"
-          echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
-
-  run-ci:
-    needs: detect-changes
+  ci:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - service: api
-            pipeline: api-ci
-          - service: web
-            pipeline: web-ci
-          - service: sync-engine
-            pipeline: sync-engine-ci
-          - service: ingestion-engine
-            pipeline: ingestion-engine-ci
-          - service: model-engine
-            pipeline: model-engine-ci
-          - service: transformation-engine
-            pipeline: transformation-engine-ci
+        service:
+          - api
+          - web
+          - sync-engine
+          - ingestion-engine
+          - model-engine
+          - transformation-engine
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install uv (if needed)
+      # 1) Create the keys folder & write your service account
+      - name: Configure GCP credentials
         run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+          mkdir -p keys
+          echo "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
 
-      - name: Install Dagger CLI
-        run: |
-          curl -L https://dl.dagger.io/dagger/install.sh | sh
-          echo "$HOME/.dagger/bin" >> $GITHUB_PATH
-
-      - name: Install Python
+      # 2) Install Python & CLI deps
+      - name: Set up Python & install CLI deps
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install dagger-io anyio pyyaml python-dotenv
 
-      - name: Sync Python deps if pyproject exists
+      # 3) Install the Dagger binary
+      - name: Install Dagger CLI
         run: |
-          if [ -f "pyproject.toml" ]; then
+          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+            | tar -xz dagger
+          sudo mv dagger /usr/local/bin/
+
+      # 4) uv sync for Python services
+      - name: uv sync (if needed)
+        run: |
+          SRCDIR="${{ matrix.service }}"
+          if [ -f "$SRCDIR/pyproject.toml" ] || [ -f "pipelines/$SRCDIR/pyproject.toml" ]; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if [ -d "pipelines/$SRCDIR" ]; then
+              cd "pipelines/$SRCDIR"
+            else
+              cd "$SRCDIR"
+            fi
             uv sync
           fi
 
-      - name: Run Dagger pipeline for ${{ matrix.service }}
-        if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
-        run: |
-          dagger run python infra/dagger/cli.py ${{ matrix.pipeline }}
+      # 5) Run the service's Dagger pipeline
+      - name: Run ${{ matrix.service }} pipeline
+        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
