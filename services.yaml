@@ -6,16 +6,6 @@ services:
     jobs:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
-      test: ["uv", "run", "pytest", "tests"]
-      coverage:
-        [
-          "uv",
-          "run",
-          "pytest",
-          "--cov=app",
-          "--cov-report=html:coverage.html",
-          "tests",
-        ]
       migrate-test:
         [
           "bash",

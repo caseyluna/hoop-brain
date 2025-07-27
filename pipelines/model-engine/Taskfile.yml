@@ -3,72 +3,30 @@ version: "3"
 vars:
   SERVICE_NAME: model-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_SCRIPT: infra/dagger/cli.py
-  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
-  DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
+  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  ENV_FILE: .env.test
 
 tasks:
-  default:
-    desc: Run all CI checks for {{.SERVICE_NAME}}
-    cmds:
-      - task: all-checks
-
-  # build local container
   build:
-    desc: Build local Docker container
+    desc: build local docker image for api (if needed)
     cmds:
-      - DOCKER_BUILDKIT=1 docker build -t {{.IMAGE_NAME}} .
-
-  # build local container and shell into it
-  dev:
-    desc: Drop into dev shell
-    deps: [build]
-    cmds:
-      - >
-        docker run --rm -it
-        -v $PWD:/app
-        -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
-        {{.IMAGE_NAME}} /bin/bash
-
-  # run precommit
-  precommit:
-    desc: Run pre-commit hooks on all files
-    cmds:
-      - pre-commit run --all-files
-
-  # run ci through dagger
-  all-checks:
-    desc: Run all CI checks for {{.SERVICE_NAME}}
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}} {{.CLI_ARGS}}"
+      - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ../..
+    dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint {{.CLI_ARGS}}"
+      - "{{.DOCKER_RUN}} ruff format --check ."
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
-    dir: ../..
+    dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck {{.CLI_ARGS}}"
+      - "{{.DOCKER_RUN}} ruff --check ."
 
-  test:
-    desc: Run tests for {{.SERVICE_NAME}}
-    dir: ../..
+  all-checks:
+    desc: Run all CI checks for {{.SERVICE_NAME}}
+    dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test {{.CLI_ARGS}}"
-
-  coverage:
-    desc: Run test coverage for {{.SERVICE_NAME}}
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} coverage {{.CLI_ARGS}}"
-
-  # run job
-  job:
-    desc: Run job - (task job -- run-main)
-    cmds:
-      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"
+      - task lint
+      - task typecheck

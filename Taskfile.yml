@@ -52,13 +52,7 @@ tasks:
     desc: Run API integration test with Dagger
     cmds:
       - "{{.DAGGER_RUN}} integration-test"
-
   ci:
     desc: Run CI with Dagger
     cmds:
       - "{{.DAGGER_RUN}} ci-all"
-
-  build:
-    desc: Build all services with Dagger
-    cmds:
-      - "{{.DAGGER_RUN}} build-all"

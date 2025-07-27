@@ -4,24 +4,32 @@ pipelines:
     steps:
       - api: [lint]
       - sync-engine: [lint]
+      - ingestion-engine: [lint]
+      - model-engine: [lint]
+      - transformation-engine: [dbt-parse]
       - web: [lint]
 
   typecheck-all:
     steps:
       - api: [typecheck]
       - sync-engine: [typecheck]
+      - ingestion-engine: [typecheck]
+      - model-engine: [typecheck]
       - web: [typecheck]
 
   coverage-all:
     steps:
-      - api: [coverage]
       - sync-engine: [coverage]
+      - ingestion-engine: [coverage]
+      - model-engine: [coverage]
 
   test-all:
     steps:
-      - api: [test]
       - sync-engine: [test]
+      - ingestion-engine: [test]
+      - model-engine: [test]
       - web: [test]
+      - transformation-engine: [dbt-test]
 
   integration-test:
     steps:
@@ -31,6 +39,9 @@ pipelines:
 
   ci-all:
     steps:
-      - api: [lint, typecheck, test, coverage]
+      - api: [lint, typecheck, integration-test]
       - sync-engine: [lint, typecheck, test, coverage]
+      - ingestion-engine: [lint, typecheck, test, coverage]
+      - model-engine: [lint, typecheck, test, coverage]
+      - transformation-engine: [dbt-parse, dbt-deps, dbt-test]
       - web: [lint, typecheck, test]

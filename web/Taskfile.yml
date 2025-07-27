@@ -3,63 +3,30 @@ version: "3"
 vars:
   SERVICE_NAME: web
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_RUN: "dagger run python infra/dagger/cli.py"
-  DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
+  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  ENV_FILE: .env.test
 
 tasks:
-  # build dev container
-  build-dev:
-    desc: Build local dev Docker container
+  build:
+    desc: build local docker image for api (if needed)
     cmds:
-      - DOCKER_BUILDKIT=1 docker build -f Dockerfile.dev -t {{.IMAGE_NAME}} .
+      - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
 
-  # drop into dev shell
-  dev:
-    desc: Start dev server in container
-    deps: [build-dev]
-    cmds:
-      - |
-        docker run --rm -it \
-        -v $PWD:/app \
-        -p 5173:5173 \
-        {{.IMAGE_NAME}}
-
-  # build prod container
-  build-prod:
-    desc: Build production container
-    cmds:
-      - DOCKER_BUILDKIT=1 docker build -t {{.SERVICE_NAME}} .
-
-  # serve prod container
-  preview-prod:
-    desc: Serve built site (optional)
-    cmds:
-      - docker run --rm -p 8080:80 {{.SERVICE_NAME}}
-
-  # run all checks via dagger
-  all-checks:
-    desc: Run all checks for {{.SERVICE_NAME}} via Dagger
-    dir: ..
-    cmds:
-      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
-
-  # run lint via dagger
   lint:
-    desc: Run lint check
+    desc: Run lint check for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+      - "{{.DOCKER_RUN}} ruff format --check ."
 
-  # run typecheck via dagger
   typecheck:
-    desc: Run typecheck
+    desc: Run typecheck for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+      - "{{.DOCKER_RUN}} ruff --check ."
 
-  # run tests via dagger
-  test:
-    desc: Run tests (if applicable)
+  all-checks:
+    desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
+      - task lint
+      - task typecheck
