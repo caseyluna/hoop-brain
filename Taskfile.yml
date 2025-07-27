@@ -31,28 +31,34 @@ includes:
     dir: ./web
 
 tasks:
-  all-checks:
-    desc: Run all checks on all services sequentially
+  # Dagger based pipelines for CI and cross service orchestration
+  lint:
+    desc: Run lint for all servies with Dagger
     cmds:
-      - task ingestion:all-checks
-      - task model:all-checks
-      - task transformation:all-checks
-      - task api:all-checks
-      - task web:all-checks
+      - "{{.DAGGER_RUN}} lint-all"
+  typecheck:
+    desc: Run typecheck for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} typecheck-all"
+  test:
+    desc: Run tests for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} test-all"
+  coverage:
+    desc: Run coverage for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} coverage-all"
+  integration-test:
+    desc: Run API integration test with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} integration-test"
 
-  api-integration-test:
-    desc: Run full integration test (migrate, populate, test api)
+  ci:
+    desc: Run CI with Dagger
     cmds:
-      - |
-        set -a
-        source {{.ENV_FILE}}
-        set +a
-        {{.DAGGER_RUN}} integration-test
-  all-tests:
-    desc: Run all tests across services
+      - "{{.DAGGER_RUN}} ci-all"
+
+  build:
+    desc: Build all services with Dagger
     cmds:
-      - task ingestion:all-checks
-      - task model:all-checks
-      - task transformation:all-checks
-      - task api:test
-      - task web:all-checks
+      - "{{.DAGGER_RUN}} build-all"

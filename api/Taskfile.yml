@@ -3,40 +3,30 @@ version: "3"
 vars:
   SERVICE_NAME: api
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_SCRIPT: infra/dagger/cli.py
-  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
   ENV_FILE: .env.test
 
 tasks:
   build:
     desc: build local docker image for api (if needed)
     cmds:
-      - docker_buildkit=1 docker build -t {{.SERVICE_NAME}}-dev .
+      - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+      - "{{.DOCKER_RUN}} ruff format --check ."
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
-
-  test:
-    desc: Run revisions, migrate, populate DB, run API tests
-    dir: ..
-    cmds:
-      - |
-        set -a
-        source {{.ENV_FILE}}
-        set +a
-        {{.DAGGER_RUN}} integration-test
+      - "{{.DOCKER_RUN}} ruff --check ."
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+      - task lint
+      - task typecheck

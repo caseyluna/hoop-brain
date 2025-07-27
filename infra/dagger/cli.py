@@ -1,144 +1,146 @@
 # infra/dagger/cli.py
 
 import argparse
-import json
 import sys
 import time
-import traceback
 
 import anyio
 import dagger
-from orchestrator import DaggerOrchestrator
-from utils import flatten_results, print_summary
+import yaml
+from dotenv import dotenv_values
+from utils import (
+    check_passed,
+    flatten_results,
+    pretty_print,
+    print_summary,
+    status_emoji,
+)
 
 
-def build_arg_parser(pipelines_config, services_config):
-    parser = argparse.ArgumentParser(
-        description="Dagger CLI for CI/CD pipelines",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+def load_yaml(filename):
+    with open(filename) as f:
+        return yaml.safe_load(f)
+
+
+SERVICES = load_yaml("services.yaml")["services"]
+PIPELINES = load_yaml("pipelines.yaml")["pipelines"]
+ENV = dotenv_values(".env.test")
+
+
+def set_env_vars(container):
+    for key, value in ENV.items():
+        container = container.with_env_variable(key, value)
+    return container
+
+
+async def start_db_service(client, db_url, db_service_name="db"):
+    db_conf = SERVICES[db_service_name]
+    dockerfile = db_conf.get("dockerfile", "Dockerfile")
+    db_container = (
+        client.container()
+        .build(
+            context=client.host().directory(db_conf["src_dir"]),
+            dockerfile=dockerfile,
+        )
+        .with_env_variable("POSTGRES_DB", db_url.rsplit("/", 1)[-1])
+        .with_env_variable("POSTGRES_USER", "postgres")
+        .with_env_variable("POSTGRES_PASSWORD", "postgres")
+        .with_exposed_port(5432)
+        .as_service()
     )
-    parser.add_argument(
-        "--env",
-        choices=["test", "prod"],
-        default="test",
-        help="Environment to use: 'test' or 'prod' (default: test)",
+    return db_container
+
+
+async def run_job(client, service, job, db_url=None, db_service=None):
+    conf = SERVICES[service]
+    dockerfile = conf.get("dockerfile", "Dockerfile")
+    container = (
+        client.container()
+        .build(
+            context=client.host().directory(conf["src_dir"]),
+            dockerfile=dockerfile,
+        )
+        .with_mounted_file(
+            "/app/keys/service_account.json",
+            client.host().file("keys/service_account.json"),
+        )
     )
-    parser.add_argument(
-        "--json", action="store_true", help="Output results in JSON format"
+    container = set_env_vars(container)
+    if db_url:
+        container = container.with_env_variable("DATABASE_URL", db_url)
+    if db_service and "db" in conf.get("dependencies", []):
+        container = container.with_service_binding("db", db_service)
+    command = conf["jobs"][job]
+    start = time.perf_counter()
+    result = await container.with_exec(command).stdout()
+    elapsed = time.perf_counter() - start
+    await pretty_print(service, job, result)
+    passed = check_passed(result)
+    return {
+        "service": service,
+        "job": job,
+        "status": status_emoji(passed),
+        "elapsed": elapsed,
+    }
+
+
+async def run_pipeline(client, pipeline, db_url=None):
+    steps = PIPELINES[pipeline].get("steps", [])
+    results = []
+    db_service = None
+    needs_db = any(
+        "db" in SERVICES[svc].get("dependencies", []) for step in steps for svc in step
     )
-    parser.add_argument(
-        "--quiet",
-        action="store_true",
-        help="Suppress detailed output, only show summary",
-    )
+    if needs_db:
+        print("Starting persistent db")
+        db_service = await start_db_service(client, db_url)
+    for step in steps:
+        for service, jobs in step.items():
+            for job in jobs:
+                res = await run_job(client, service, job, db_url, db_service)
+                results.append(res)
+    return results
+
+
+def build_arg_parser():
+    parser = argparse.ArgumentParser(description="Dagger CLI")
+    parser.add_argument("--env", choices=["test", "prod"], default="test")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # check
-    check_parser = subparsers.add_parser(
-        "check", help="Run a specific check for a service"
-    )
-    check_parser.add_argument(
-        "service",
-        choices=list(services_config.keys()),
-        help="Service to run the check on",
-    )
-    check_parser.add_argument("check", help="Name of the check to run")
+    for pipeline in PIPELINES:
+        subparsers.add_parser(pipeline, help=f"Run pipeline: {pipeline}")
 
-    # job
-    job_parser = subparsers.add_parser("job", help="Run a specific job for a service")
-    job_parser.add_argument(
-        "service",
-        choices=list(services_config.keys()),
-        help="Service to run the job on",
-    )
-    job_parser.add_argument("job", help="Name of the job to run")
-    job_parser.add_argument(
-        "job_args", nargs=argparse.REMAINDER, help="Arguments for the job"
-    )
+    job_parser = subparsers.add_parser("job", help="Run a job for a service")
+    job_parser.add_argument("service", choices=SERVICES.keys())
+    job_parser.add_argument("job", help="Job name to run")
 
-    # all-checks-for-service
-    acfs_parser = subparsers.add_parser(
-        "all-checks-for-service",
-        help="Run all checks for a specific service",
-    )
-    acfs_parser.add_argument(
-        "service",
-        choices=list(services_config.keys()),
-        help="Service to run all checks on",
-    )
-
-    # all-checks
-    ac_parser = subparsers.add_parser(
-        "all-checks", help="Run all checks for all or specified services"
-    )
-    ac_parser.add_argument(
-        "services",
-        choices=list(services_config.keys()),
-        help="Services to run all checks on (default: all services)",
-    )
-    subparsers.add_parser("integration-test", help="Run full integration test")
-    for pipeline_name in pipelines_config.keys():
-        subparsers.add_parser(
-            pipeline_name,
-            help=f"Run the '{pipeline_name}' pipeline defined in pipelines.yaml",
-        )
     return parser
 
 
 async def main():
-    try:
-        # load configs to build parser
-        async with dagger.Connection() as client:
-            orch = DaggerOrchestrator(client)
-            pipelines_config = orch.pipelines_config
-            services_config = orch.services_config
-            print("Args:", sys.argv)
-            print(f"Loaded services: {list(services_config.keys())}")
-            parser = build_arg_parser(pipelines_config, services_config)
-            args = parser.parse_args()
+    parser = build_arg_parser()
+    args = parser.parse_args()
 
-            # set the DB URL based on the environment
-            db_url = (
-                "postgresql://postgres:postgres@db:5432/hoopbrain"
-                if args.env == "prod"
-                else "postgresql://postgres:postgres@db:5432/hoopbrain_test"
-            )
-            orch.db_url = db_url
-            overall_start = time.perf_counter()
-            if args.command == "check":
-                results = [await orch.run_check(args.service, args.check)]
-            elif args.command == "job":
-                results = [await orch.run_job(args.service, args.job, args.job_args)]
-            elif args.command == "integration-test":
-                await orch.run_integration_test()
-            elif args.command == "all-checks-for-service":
-                results = await orch.run_all_checks_for_service(args.service)
-            elif args.command == "all-checks":
-                services = (
-                    args.services if args.services else list(services_config.keys())
-                )
-                results = await orch.run_all_checks_for_services_parallel(services)
-            elif args.command in pipelines_config:
-                results = await orch.run_pipeline(args.command)
-            else:
-                parser.print_help()
-                sys.exit(1)
-            overall_duration = time.perf_counter() - overall_start
-            results = flatten_results(results)
-            if args.json:
-                print(
-                    json.dumps(
-                        {"results": results, "total_time": overall_duration}, indent=2
-                    )
-                )
-            elif not args.quiet:
-                print_summary(results, overall_duration)
-    except Exception as e:
-        if "--debut" in sys.argv:
-            traceback.print_exc()
+    db_url = (
+        "postgresql://postgres:postgres@db:5432/hoopbrain"
+        if args.env == "prod"
+        else "postgresql://postgres:postgres@db:5432/hoopbrain_test"
+    )
+
+    async with dagger.Connection() as client:
+        overall_start = time.perf_counter()
+
+        if args.command == "job":
+            results = [await run_job(client, args.service, args.job, db_url)]
+        elif args.command in PIPELINES:
+            results = await run_pipeline(client, args.command, db_url)
         else:
-            print(f"\n[ERROR]: {e}", file=sys.stderr)
-        sys.exit(1)
+            parser.print_help()
+            sys.exit(1)
+
+        overall_duration = time.perf_counter() - overall_start
+        results = flatten_results(results)
+        print_summary(results, overall_duration)
 
 
 if __name__ == "__main__":

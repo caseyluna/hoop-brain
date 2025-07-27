@@ -1,82 +1,41 @@
-# services.yaml
 services:
   api:
     type: fastapi
     src_dir: api
-    description: "Main FastAPI backend"
-    dependencies: []
-    checks:
+    dependencies: [db]
+    jobs:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
-    jobs: {}
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=app",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
+      migrate-test:
+        [
+          "bash",
+          "-c",
+          "./scripts/wait-for-db.sh db psql -h db -U postgres -c 'CREATE DATABASE hoopbrain_test' || true && ./scripts/wait-for-db.sh db uv run alembic upgrade head",
+        ]
+      integration-test: ["uv", "run", "pytest", "tests"]
+      run-main:
+        ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
   db:
     type: postgres
     src_dir: db/postgres
-    description: "Postgres database"
-    dependencies: []
-    checks: {}
     jobs: {}
-
-  web:
-    type: react
-    src_dir: web
-    description: "Frontend React app"
-    dependencies: []
-    checks:
-      lint: ["npm", "run", "lint"]
-      typecheck: ["npm", "run", "typecheck"]
-      build: ["npm", "run", "build"]
-      test: ["npm", "run", "test"]
-    jobs: {}
-
-  ingestion-engine:
-    type: python
-    src_dir: pipelines/ingestion-engine
-    description: "Ingestion engine"
-    dependencies: []
-    checks:
-      lint: ["uv", "run", "ruff", "format", "--check", "."]
-      typecheck: ["uv", "run", "ruff", "check", "."]
-      test: ["uv", "run", "pytest", "tests"]
-      coverage:
-        [
-          "uv",
-          "run",
-          "pytest",
-          "--cov=ingestion_engine",
-          "--cov-report=html:coverage.html",
-          "tests",
-        ]
-    jobs:
-      run-main: ["uv", "run", "python", "src/main.py"]
-
-  model-engine:
-    type: python
-    src_dir: pipelines/model-engine
-    description: "Model engine"
-    dependencies: []
-    checks:
-      lint: ["uv", "run", "ruff", "format", "--check", "."]
-      typecheck: ["uv", "run", "ruff", "check", "."]
-      test: ["uv", "run", "pytest", "tests"]
-      coverage:
-        [
-          "uv",
-          "run",
-          "pytest",
-          "--cov=model_engine",
-          "--cov-report=html:coverage.html",
-          "tests",
-        ]
-    jobs:
-      run-main: ["uv", "run", "python", "src/main.py"]
 
   sync-engine:
     type: python
     src_dir: pipelines/sync-engine
-    description: "Sync engine"
     dependencies: [db]
-    checks:
+    jobs:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
       test: ["uv", "run", "pytest", "tests"]
@@ -89,18 +48,60 @@ services:
           "--cov-report=html:coverage.html",
           "tests",
         ]
+      run-main: ["uv", "run", "python", "src/main.py"]
+
+  web:
+    type: react
+    src_dir: web
+    dockerfile: Dockerfile.dev
     jobs:
+      lint: ["npm", "run", "lint"]
+      typecheck: ["npm", "run", "typecheck"]
+      build: ["npm", "run", "build"]
+      test: ["npm", "run", "test"]
+
+  ingestion-engine:
+    type: python
+    src_dir: pipelines/ingestion-engine
+    jobs:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=ingestion_engine",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
+      run-main: ["uv", "run", "python", "src/main.py"]
+
+  model-engine:
+    type: python
+    src_dir: pipelines/model-engine
+    jobs:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+      coverage:
+        [
+          "uv",
+          "run",
+          "pytest",
+          "--cov=model_engine",
+          "--cov-report=html:coverage.html",
+          "tests",
+        ]
       run-main: ["uv", "run", "python", "src/main.py"]
 
   transformation-engine:
     type: dbt
     src_dir: pipelines/transformation-engine
-    description: "DBT transformation engine"
-    dependencies: []
-    checks:
+    jobs:
       dbt-parse: ["dbt", "parse", "--profiles-dir", "/app/profiles"]
       dbt-deps: ["dbt", "deps", "--profiles-dir", "/app/profiles"]
       dbt-test: ["dbt", "test", "--profiles-dir", "/app/profiles"]
       dbt-build: ["dbt", "build", "--profiles-dir", "/app/profiles"]
-    jobs:
       run-dbt-build: ["dbt", "build", "--profiles-dir", "/app/profiles"]
