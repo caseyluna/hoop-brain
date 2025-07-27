@@ -1,12 +1,13 @@
 services:
   postgres:
-    image: postgres:15
+    build:
+      context: ./db/postgres
     container_name: hoopbrain-postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: hoopbrain
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -19,9 +20,8 @@ services:
       context: ./api
     container_name: hoopbrain-api
     env_file:
-      - ./api/.env
+      - .env.test
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hoopbrain
       - PYTHONPATH=/app
     ports:
       - "8000:8000"

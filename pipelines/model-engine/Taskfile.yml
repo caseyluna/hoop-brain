@@ -3,7 +3,8 @@ version: "3"
 vars:
   SERVICE_NAME: model-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_RUN: "dagger run python infra/dagger/run_ci_pipeline.py"
+  DAGGER_SCRIPT: infra/dagger/cli.py
+  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
 
 tasks:
@@ -35,35 +36,34 @@ tasks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} lint {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} typecheck {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
 
   test:
     desc: Run tests for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} test {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
 
   coverage:
     desc: Run test coverage for {{.SERVICE_NAME}}
     dir: ../..
     cmds:
-      - "{{.DAGGER_RUN}} coverage {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} coverage"
 
   # run job
   job:
     desc: Run job - (task job -- run-main)
     cmds:
-      - |
-        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"

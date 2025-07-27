@@ -7,19 +7,20 @@ from utils import check_passed, pretty_print
 
 
 class DaggerOrchestrator:
-    def __init__(self, client):
+    def __init__(self, client, db_url=None):
         self.client = client
+        self.db_url = db_url
         self.services_config = load_services_config()
         self.pipelines_config = load_pipelines_config()
 
     def _get_service(self, name):
         conf = self.services_config[name]
-        return GenericService(self.client, name, conf)
+        return GenericService(self.client, name, conf, db_url=self.db_url)
 
     async def run_check(self, service_name, check):
         service = self._get_service(service_name)
         if service.type == "fastapi" and check == "test":
-            container = service.get_test_container_with_deps()
+            container = await service.get_test_container_with_deps()
         else:
             container = service.get_container()
         command = service.get_command(check)
@@ -33,10 +34,18 @@ class DaggerOrchestrator:
             "elapsed": 0,
         }
 
-    async def run_job(self, service_name, job):
+    async def run_job(self, service_name, job, job_args=None):
         service = self._get_service(service_name)
         container = service.get_container()
         command = service.get_job_command(job)
+
+        # Ensure it's a list before appending
+        if isinstance(command, str):
+            command = [command]
+
+        if job_args:
+            command += job_args
+
         result = await container.with_exec(command).stdout()
         await pretty_print(service_name, job, result)
         passed = check_passed(result)

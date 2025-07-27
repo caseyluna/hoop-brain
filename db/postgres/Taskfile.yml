@@ -1,0 +1,51 @@
+version: "3"
+
+vars:
+  CONTAINER_NAME: hoopbrain-db
+  POSTGRES_VERSION: "15"
+  HOST_PORT: "5432"
+  DB_USER: "postgres"
+  DB_PASS: "postgres"
+  DB_NAME: "hoopbrain"
+  VOLUME_NAME: "hoopbrain_pgdata"
+
+tasks:
+  start:
+    desc: Start local Postgres in Docker
+    cmds:
+      - docker run --rm -d
+        --name {{.CONTAINER_NAME}}
+        -p {{.HOST_PORT}}:5432
+        -e POSTGRES_USER={{.DB_USER}}
+        -e POSTGRES_PASSWORD={{.DB_PASS}}
+        -e POSTGRES_DB={{.DB_NAME}}
+        -v {{.VOLUME_NAME}}:/var/lib/postgresql/data
+        postgres:{{.POSTGRES_VERSION}}
+
+  stop:
+    desc: Stop and remove the local Postgres container
+    cmds:
+      - docker stop {{.CONTAINER_NAME}}
+
+  reset:
+    desc: Stop and remove container + wipe volume
+    cmds:
+      - docker stop {{.CONTAINER_NAME}} || true
+      - docker volume rm {{.VOLUME_NAME}} || true
+
+  psql:
+    desc: Open psql shell to the database
+    cmds:
+      - >
+        docker exec -it {{.CONTAINER_NAME}} psql
+        -U {{.DB_USER}} -d {{.DB_NAME}}
+
+  logs:
+    desc: Show logs for the DB container
+    cmds:
+      - docker logs -f {{.CONTAINER_NAME}}
+
+  status:
+    desc: Check if DB is running
+    cmds:
+      - docker ps --filter "name={{.CONTAINER_NAME}}"

@@ -1,0 +1,20 @@
+# use node:20 as base image
+FROM node:20
+
+WORKDIR /app
+
+# copy packages and install deps
+COPY package.json package-lock.json* ./
+RUN npm  ci || npm install
+
+# copy app source code
+COPY . .
+
+# expose port 5173 for the app
+EXPOSE 5173
+
+# force color output in logs
+ENV FORCE_COLOR=1
+
+# run the app in development mode
+CMD ["npm", "run", "dev"]

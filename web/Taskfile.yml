@@ -2,39 +2,70 @@ version: "3"
 
 vars:
   SERVICE_NAME: web
-  DAGGER_SCRIPT: "../infra/dagger/cli.py"
-  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+  IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
+  DAGGER_RUN: "dagger run python infra/dagger/cli.py"
+  DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
 
 tasks:
-  install:
-    desc: Install dependencies
+  # build dev container
+  build-dev:
+    desc: Build local dev Docker container
     cmds:
-      - npm install
+      - DOCKER_BUILDKIT=1 docker build -f Dockerfile.dev -t {{.IMAGE_NAME}} .
 
+  # drop into dev shell
   dev:
-    desc: Start the dev server (Vite)
+    desc: Start dev server in container
+    deps: [build-dev]
     cmds:
-      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} dev"
+      - |
+        docker run --rm -it \
+        -v $PWD:/app \
+        -p 5173:5173 \
+        {{.IMAGE_NAME}}
 
-  lint:
+  # build prod container
+  build-prod:
+    desc: Build production container
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+      - DOCKER_BUILDKIT=1 docker build -t {{.SERVICE_NAME}} .
 
-  typecheck:
+  # serve prod container
+  preview-prod:
+    desc: Serve built site (optional)
     cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+      - docker run --rm -p 8080:80 {{.SERVICE_NAME}}
 
-  build:
-    desc: Build for production
-    cmds:
-      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} build"
-
+  # run all checks via dagger
   all-checks:
+    desc: Run all checks for {{.SERVICE_NAME}} via Dagger
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
 
-  job:
-    desc: Run job — (task job -- dev)
+  # run lint via dagger
+  lint:
+    desc: Run lint check
+    dir: ../..
     cmds:
-      - |
-        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+
+  # run typecheck via dagger
+  typecheck:
+    desc: Run typecheck
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+
+  # run tests via dagger
+  test:
+    desc: Run tests (if applicable)
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
+
+  # run job
+  job:
+    desc: Run job (task job -- dev)
+    cmds:
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"

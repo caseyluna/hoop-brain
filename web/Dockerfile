@@ -1,12 +1,18 @@
-FROM node:20
+# === Build stage ===
+FROM node:20 AS builder
 
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
+RUN npm run build
 
-EXPOSE 5173
+# === Runtime stage ===
+FROM nginx:alpine
 
-CMD ["npm", "run", "dev"]
+# Copy built assets to NGINX's public directory
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

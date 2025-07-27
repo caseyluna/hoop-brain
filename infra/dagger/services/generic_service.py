@@ -1,13 +1,16 @@
+from typing import Optional
+
 import dagger
 
 
 class GenericService:
     def __init__(
-        self, client: dagger.Client, name: str, conf: dict, no_cache: bool = False
+        self, client: dagger.Client, name: str, conf: dict, db_url: Optional[str] = None
     ):
         self.client = client
         self.name = name
         self.conf = conf
+        self.db_url = db_url
         self.type = conf["type"]
         self.src_dir = conf["src_dir"]
         self.checks = conf.get("checks", {})
@@ -44,4 +47,27 @@ class GenericService:
 
     def get_test_container_with_deps(self):
         # build a Dagger container with dependencies for integration testing
-        return self.get_container()
+        container = self.get_container()
+        if self.name == "api":
+            # build postgres container
+            db = (
+                self.client.container()
+                .build(
+                    context=self.client.host().directory("db/postgres"),
+                    dockerfile="Dockerfile",
+                )
+                .with_env_variable("POSTGRES_DB", "hoopbrain")
+                .with_env_variable("POSTGRES_USER", "postgres")
+                .with_env_variable("POSTGRES_PASSWORD", "postgres")
+                .with_exposed_port(5432)
+                .as_service()
+            )
+
+            api = (
+                self.get_container()
+                .with_service_binding("db", db)
+                .with_env_variable("DATABASE_URL", self.db_url)
+            )
+            return api
+        else:
+            return self.get_container()

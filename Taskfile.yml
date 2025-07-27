@@ -17,6 +17,14 @@ includes:
     taskfile: ./pipelines/transformation-engine/Taskfile.yml
     dir: ./pipelines/transformation-engine
 
+  api:
+    taskfile: ./api/Taskfile.yml
+    dir: ./api
+
+  web:
+    taskfile: ./web/Taskfile.yml
+    dir: ./web
+
 tasks:
   all-checks:
     desc: Run all checks on all services sequentially

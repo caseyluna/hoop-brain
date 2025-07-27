@@ -2,41 +2,54 @@ version: "3"
 
 vars:
   SERVICE_NAME: transformation-engine
-  DAGGER_SCRIPT: "../../infra/dagger/cli.py"
+  DAGGER_SCRIPT: infra/dagger/cli.py
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
 tasks:
   parse:
     desc: Run dbt parse to validate project structure
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-parse"
 
   deps:
     desc: Install dbt dependencies
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-deps"
 
   build:
-    desc: Run dbt build (full run - models + tests)
+    desc: Run dbt build (models + tests)
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-build"
 
   test:
-    desc: Run dbt test (separate from build if needed)
+    desc: Run dbt test (models with tests only)
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-test"
 
-  run-dbt-build:
-    desc: Run job defined in services.yaml (usually same as `build`)
-    cmds:
-      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-dbt-build"
-
   all-checks:
-    desc: Run all checks (parse, deps, build, test) in parallel
+    desc: Run all dbt-related checks for this service in parallel
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
 
+  run-dbt-build:
+    desc: Run job defined in services.yaml (typically same as build)
+    dir: ../..
+    cmds:
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-dbt-build"
+
   job:
-    desc: Run job — (task job -- run-dbt-build)
+    desc: Run a custom job (e.g. task job -- run-dbt-build)
+    dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"
+
+  precommit:
+    desc: Run pre-commit hooks
+    dir: ../..
+    cmds:
+      - pre-commit run --all-files
