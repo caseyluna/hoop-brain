@@ -23,13 +23,12 @@ jobs:
           - transformation-engine
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure GCP credentials
+      - name: Prepare dummy GCP credentials
         run: |
           mkdir -p keys
-          printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
+          echo '{}' > keys/service_account.json
 
       - name: Ensure DBT profiles (transformation-engine only)
         if: ${{ matrix.service == 'transformation-engine' }}
@@ -80,6 +79,8 @@ jobs:
 
       - name: Run ${{ matrix.service }} pipeline
         run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
 
   integration-test:
     name: Integration Test
@@ -87,13 +88,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure GCP credentials
+      - name: Prepare real GCP credentials
         run: |
+          if [ -z "${GCP_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT_JSON must be set"
+            exit 1
+          fi
           mkdir -p keys
-          printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
+          cat << 'EOF' > keys/service_account.json
+          ${GCP_SERVICE_ACCOUNT_JSON}
+          EOF
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
       - name: Ensure DBT profiles
         run: |
@@ -129,3 +137,5 @@ jobs:
 
       - name: Run Integration Test pipeline
         run: dagger run python infra/dagger/cli.py integration-test
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
