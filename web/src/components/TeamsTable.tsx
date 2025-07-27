@@ -1,3 +1,4 @@
+// web/src/components/TeamsTable.tsx
 import React, { useEffect, useState } from "react";
 
 type Team = {

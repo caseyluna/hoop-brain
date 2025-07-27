@@ -4,13 +4,11 @@ services:
     type: fastapi
     src_dir: api
     description: "Main FastAPI backend"
-    dependencies: [db, sync-engine]
+    dependencies: []
     checks:
       lint: ["uv", "run", "ruff", "format", "--check", "."]
       typecheck: ["uv", "run", "ruff", "check", "."]
-    jobs:
-      run-main:
-        ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    jobs: {}
   db:
     type: postgres
     src_dir: db/postgres
@@ -29,8 +27,7 @@ services:
       typecheck: ["npm", "run", "typecheck"]
       build: ["npm", "run", "build"]
       test: ["npm", "run", "test"]
-    jobs:
-      dev: ["npm", "run", "dev"]
+    jobs: {}
 
   ingestion-engine:
     type: python

@@ -40,35 +40,7 @@ tasks:
       - task api:all-checks
       - task web:all-checks
 
-  ci-all:
-    desc: Run Dagger pipeline for full CI
-    cmds:
-      - "{{.DAGGER_RUN}} ci-all"
-  ci-backend:
-    desc: Run backend CI pipeline
-    cmds:
-      - "{{.DAGGER_RUN}} ci-backend"
-  ci-frontend:
-    desc: Run frontend CI pipeline
-    cmds:
-      - "{{.DAGGER_RUN}} ci-frontend"
-  lint:
-    desc: Run lint-all pipeline
-    cmds:
-      - "{{.DAGGER_RUN}} lint-all"
-  test:
-    desc: Run test-all pipeline
-    cmds:
-      - "{{.DAGGER_RUN}} test-all"
-  build:
-    desc: Run build-all pipeline
-    cmds:
-      - "{{.DAGGER_RUN}} build-all"
-  pipeline:
-    desc: Run a named pipeline (task pipeline -- pipeline_name)
-    cmds:
-      - "{{.DAGGER_RUN}} {{.CLI_ARGS}}"
-  integration-test:
+  api-integration-test:
     desc: Run full integration test (migrate, populate, test api)
     cmds:
       - |
@@ -76,3 +48,11 @@ tasks:
         source {{.ENV_FILE}}
         set +a
         {{.DAGGER_RUN}} integration-test
+  all-tests:
+    desc: Run all tests across services
+    cmds:
+      - task ingestion:all-checks
+      - task model:all-checks
+      - task transformation:all-checks
+      - task api:test
+      - task web:all-checks

@@ -13,18 +13,6 @@ tasks:
     cmds:
       - docker_buildkit=1 docker build -t {{.SERVICE_NAME}}-dev .
 
-  dev:
-    desc: Run a shell in the API dev container (with code mounted, for live editing)
-    deps: [build]
-    cmds:
-      - |
-        docker run --rm -it \
-          -p 8000:8000 \
-          -v $PWD/app:/app/app \
-          -v $PWD/tests:/app/tests \
-          -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hoopbrain_dev \
-          {{.SERVICE_NAME}}-dev /bin/bash
-
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
     dir: ..
@@ -45,24 +33,10 @@ tasks:
         set -a
         source {{.ENV_FILE}}
         set +a
-        {{.DAGGER_RUN}} test-api
+        {{.DAGGER_RUN}} integration-test
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ..
     cmds:
       - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
-
-  alembic-revision:
-    desc: create an alembic migration with a message
-    dir: ..
-    vars:
-      msg: ""
-    cmds:
-      - "{{.DAGGER_RUN}} job api alembic-revision '{{.MSG}}'"
-
-  job:
-    desc: run job — (task job -- run-main)
-    cmds:
-      - |
-        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}

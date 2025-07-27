@@ -1,62 +1,18 @@
-# pipelines.yaml
+# pipelines.yaml -- these dont work
 pipelines:
-  test-api:
+  all-checks:
     steps:
-      - api: [migrate-test]
-      - sync-engine: [run-main]
-  ci-all:
-    description: "Run all checks for all services in parallel"
-    services:
-      - ingestion-engine
-      - transformation-engine
-      - model-engine
-      - sync-engine
-      - api
-      - web
-    order: parallel
-
-  ci-backend:
-    description: "Run all checks for backend services"
-    services:
-      - ingestion-engine
-      - transformation-engine
-      - model-engine
-      - sync-engine
-      - api
-    order: parallel
-
-  ci-frontend:
-    description: "Run all checks for frontend"
-    services:
-      - web
-    order: parallel
-
-  test-all:
-    description: "Run all test checks for all services"
+      - api: ["all-checks"]
+      - web: ["all-checks"]
+      - ingestion-engine: ["all-checks"]
+      - model-engine: ["all-checks"]
+      - sync-engine: ["all-checks"]
+      - transformation-engine: ["all-checks"]
+  all-tests:
     steps:
-      - ingestion-engine: [test]
-      - transformation-engine: [test]
-      - model-engine: [test]
-      - sync-engine: [test]
-      - api: [test]
-      - web: [test]
-
-  build-all:
-    description: "Run build for all services that support it"
-    steps:
-      - ingestion-engine: [build]
-      - transformation-engine: [build]
-      - model-engine: [build]
-      - sync-engine: [build]
-      - api: [build]
-      - web: [build]
-
-  lint-all:
-    description: "Run lint for all services"
-    steps:
-      - ingestion-engine: [lint]
-      - transformation-engine: [lint]
-      - model-engine: [lint]
-      - sync-engine: [lint]
-      - api: [lint]
-      - web: [lint]
+      - api: ["integration-test"]
+      - web: ["test"]
+      - ingestion-engine: ["test"]
+      - model-engine: ["test"]
+      - sync-engine: ["test"]
+      - transformation-engine: ["test"]

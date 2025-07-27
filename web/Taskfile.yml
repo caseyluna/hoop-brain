@@ -46,26 +46,20 @@ tasks:
   # run lint via dagger
   lint:
     desc: Run lint check
-    dir: ../..
+    dir: ..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
 
   # run typecheck via dagger
   typecheck:
     desc: Run typecheck
-    dir: ../..
+    dir: ..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
 
   # run tests via dagger
   test:
     desc: Run tests (if applicable)
-    dir: ../..
+    dir: ..
     cmds:
       - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
-
-  # run job
-  job:
-    desc: Run job (task job -- dev)
-    cmds:
-      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"
