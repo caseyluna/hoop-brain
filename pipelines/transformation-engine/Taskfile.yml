@@ -2,60 +2,41 @@ version: "3"
 
 vars:
   SERVICE_NAME: transformation-engine
-  IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DAGGER_SCRIPT: "infra/dagger/run_ci_pipeline.py"
-  DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
+  DAGGER_SCRIPT: "../../infra/dagger/cli.py"
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
 tasks:
-  # === Build + Dev Shell ===
+  parse:
+    desc: Run dbt parse to validate project structure
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-parse"
+
+  deps:
+    desc: Install dbt dependencies
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-deps"
 
   build:
-    desc: Build local dev Docker container (if you want an interactive shell)
+    desc: Run dbt build (full run - models + tests)
     cmds:
-      - DOCKER_BUILDKIT=1 docker build -t {{.IMAGE_NAME}} .
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-build"
 
-  dev:
-    desc: Start an interactive shell inside the local Docker container
-    deps: [build]
+  test:
+    desc: Run dbt test (separate from build if needed)
     cmds:
-      - docker run --rm -it -v $PWD:/app {{.IMAGE_NAME}} /bin/bash
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} dbt-test"
 
-  # === Precommit + CI ===
-
-  precommit:
-    desc: Run pre-commit hooks on all files
+  run-dbt-build:
+    desc: Run job defined in services.yaml (usually same as `build`)
     cmds:
-      - pre-commit run --all-files
-
-  # === Dagger Checks ===
-
-  dbt-parse:
-    desc: Run dbt parse via Dagger
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} dbt-parse {{.SERVICE_NAME}}"
-
-  dbt-deps:
-    desc: Run dbt deps via Dagger
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} dbt-deps {{.SERVICE_NAME}}"
-
-  dbt-test:
-    desc: Run dbt test via Dagger
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} dbt-test {{.SERVICE_NAME}}"
-
-  dbt-build:
-    desc: Run dbt build via Dagger
-    dir: ../..
-    cmds:
-      - "{{.DAGGER_RUN}} dbt-build {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-dbt-build"
 
   all-checks:
-    desc: Run all Dagger checks in parallel (recommended for CI)
-    dir: ../..
+    desc: Run all checks (parse, deps, build, test) in parallel
     cmds:
-      - "{{.DAGGER_RUN}} all-checks {{.SERVICE_NAME}}"
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+
+  job:
+    desc: Run job — (task job -- run-dbt-build)
+    cmds:
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}"

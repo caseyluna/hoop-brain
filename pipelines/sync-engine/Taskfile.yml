@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  SERVICE_NAME: model-engine
+  SERVICE_NAME: sync-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
   DAGGER_RUN: "dagger run python infra/dagger/run_ci_pipeline.py"
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"

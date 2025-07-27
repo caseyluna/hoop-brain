@@ -1,7 +1,7 @@
 version: "3"
 
 vars:
-  DAGGER_SCRIPT: "infra/dagger/run_ci_pipeline.py"
+  DAGGER_SCRIPT: "infra/dagger/cli.py"
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
 
 includes:
@@ -24,3 +24,18 @@ tasks:
       - task ingestion:all-checks
       - task model:all-checks
       - task transformation:all-checks
+      - task api:all-checks
+      - task web:all-checks
+
+  ci-all:
+    desc: Run Dagger pipeline for full CI
+    cmds:
+      - "{{.DAGGER_RUN}} ci-all"
+  ci-backend:
+    desc: Run backend CI pipeline
+    cmds:
+      - "{{.DAGGER_RUN}} ci-backend"
+  ci-frontend:
+    desc: Run frontend CI pipeline
+    cmds:
+      - "{{.DAGGER_RUN}} ci-frontend"

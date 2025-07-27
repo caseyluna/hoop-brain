@@ -1,4 +1,26 @@
+# services.yaml
 services:
+  api:
+    type: fastapi
+    src_dir: api
+    checks:
+      lint: ["uv", "run", "ruff", "format", "--check", "."]
+      typecheck: ["uv", "run", "ruff", "check", "."]
+      test: ["uv", "run", "pytest", "tests"]
+    jobs:
+      run-main:
+        ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  web:
+    type: react
+    src_dir: web
+    checks:
+      lint: ["npm", "run", "lint"]
+      typecheck: ["npm", "run", "typecheck"]
+      build: ["npm", "run", "build"]
+    jobs:
+      dev: ["npm", "run", "dev"]
+
   ingestion-engine:
     type: python
     src_dir: pipelines/ingestion-engine
@@ -17,6 +39,7 @@ services:
         ]
     jobs:
       run-main: ["uv", "run", "python", "src/main.py"]
+
   model-engine:
     type: python
     src_dir: pipelines/model-engine
@@ -65,7 +88,3 @@ services:
       dbt-build: ["dbt", "build", "--profiles-dir", /app/profiles"]
     jobs:
       run-dbt-build: ["dbt", "build", "--profiles-dir", "/app/profiles"]
-
-  fastapi:
-  frontend-app:
-  postgres:

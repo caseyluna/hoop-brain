@@ -7,15 +7,15 @@ vars:
   DOCKER_RUN: "docker run --rm -v $PWD:/app {{.IMAGE_NAME}}"
 
 tasks:
-  # === Build + Dev Shell ===
-
+  # build local container
   build:
-    desc: Build local dev Docker container (if you want an interactive shell)
+    desc: Build local Docker container
     cmds:
       - DOCKER_BUILDKIT=1 docker build -t {{.IMAGE_NAME}} .
 
+  # build local container and shell into it
   dev:
-    desc: Start an interactive shell inside the local Docker container
+    desc: Drop into dev shell
     deps: [build]
     cmds:
       - >
@@ -24,15 +24,13 @@ tasks:
         -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
         {{.IMAGE_NAME}} /bin/bash
 
-  # === Precommit + CI ===
-
+  # run precommit
   precommit:
     desc: Run pre-commit hooks on all files
     cmds:
       - pre-commit run --all-files
 
-  # === Dagger Checks ===
-
+  # run ci through dagger
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ../..
@@ -62,3 +60,10 @@ tasks:
     dir: ../..
     cmds:
       - "{{.DAGGER_RUN}} coverage {{.SERVICE_NAME}}"
+
+  # run job
+  job:
+    desc: Run job - (task job -- run-main)
+    cmds:
+      - |
+        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}

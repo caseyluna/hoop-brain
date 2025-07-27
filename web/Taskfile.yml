@@ -1,0 +1,40 @@
+version: "3"
+
+vars:
+  SERVICE_NAME: web
+  DAGGER_SCRIPT: "../infra/dagger/cli.py"
+  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+
+tasks:
+  install:
+    desc: Install dependencies
+    cmds:
+      - npm install
+
+  dev:
+    desc: Start the dev server (Vite)
+    cmds:
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} dev"
+
+  lint:
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+
+  typecheck:
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+
+  build:
+    desc: Build for production
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} build"
+
+  all-checks:
+    cmds:
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+
+  job:
+    desc: Run job — (task job -- dev)
+    cmds:
+      - |
+        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}

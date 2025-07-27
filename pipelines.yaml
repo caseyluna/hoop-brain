@@ -1,6 +1,43 @@
+# pipelines.yaml
 pipelines:
   ci-all:
     services:
       - ingestion-engine
+      - transformation-engine
+      - model-engine
       - sync-engine
-    order: sequential
+      - api
+      - web
+    order: parallel
+
+  ci-backend:
+    services:
+      - ingestion-engine
+      - transformation-engine
+      - model-engine
+      - sync-engine
+      - api
+    order: parallel
+
+  ci-frontend:
+    services:
+      - web
+    order: parallel
+
+  test-all:
+    steps:
+      - ingestion-engine: [test]
+      - transformation-engine: [test]
+      - model-engine: [test]
+      - sync-engine: [test]
+      - api: [test]
+      - web: [test]
+
+  build-all:
+    steps:
+      - ingestion-engine: [build]
+      - transformation-engine: [build]
+      - model-engine: [build]
+      - sync-engine: [build]
+      - api: [build]
+      - web: [build]

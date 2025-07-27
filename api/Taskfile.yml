@@ -1,0 +1,39 @@
+version: "3"
+
+vars:
+  SERVICE_NAME: api
+  DAGGER_SCRIPT: "../infra/dagger/cli.py"
+  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+
+tasks:
+  build:
+    desc: Build local Docker image for API (if needed)
+    cmds:
+      - DOCKER_BUILDKIT=1 docker build -t {{.SERVICE_NAME}}-dev .
+
+  dev:
+    desc: Run API with uvicorn (hosted at http://localhost:8000)
+    cmds:
+      - "{{.DAGGER_RUN}} job {{.SERVICE_NAME}} run-main"
+
+  lint:
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} lint"
+
+  typecheck:
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} typecheck"
+
+  test:
+    cmds:
+      - "{{.DAGGER_RUN}} check {{.SERVICE_NAME}} test"
+
+  all-checks:
+    cmds:
+      - "{{.DAGGER_RUN}} all-checks-for-service {{.SERVICE_NAME}}"
+
+  job:
+    desc: Run job — (task job -- run-main)
+    cmds:
+      - |
+        {{.DAGGER_RUN}} job {{.SERVICE_NAME}} {{.CLI_ARGS}}
