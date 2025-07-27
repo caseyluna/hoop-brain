@@ -1,9 +1,9 @@
-name: CI
+name: Dagger CI
 
 on:
-  pull_request:
-    branches: [main]
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
 
 jobs:
@@ -12,13 +12,25 @@ jobs:
     outputs:
       changed_services: ${{ steps.set-changes.outputs.changed_services }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - id: set-changes
+      - name: Detect changed services
+        id: set-changes
         run: |
-          git fetch origin main
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          git fetch origin main || true
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD || echo "")
+
           SERVICES=()
+          if echo "$CHANGED_FILES" | grep -q '^api/'; then
+            SERVICES+=("api")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^web/'; then
+            SERVICES+=("web")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^pipelines/sync-engine/'; then
+            SERVICES+=("sync-engine")
+          fi
           if echo "$CHANGED_FILES" | grep -q '^pipelines/ingestion-engine/'; then
             SERVICES+=("ingestion-engine")
           fi
@@ -28,31 +40,16 @@ jobs:
           if echo "$CHANGED_FILES" | grep -q '^pipelines/transformation-engine/'; then
             SERVICES+=("transformation-engine")
           fi
-          if echo "$CHANGED_FILES" | grep -q '^pipelines/sync-engine/'; then
-            SERVICES+=("sync-engine")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^api/'; then
-            SERVICES+=("api")
-          fi
-          if echo "$CHANGED_FILES" | grep -q '^web/'; then
-            SERVICES+=("web")
-          fi
+
+          echo "Detected changed services: ${SERVICES[*]}"
           echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
 
-  code-checks:
+  run-ci:
     needs: detect-changes
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        service:
-          [
-            api,
-            web,
-            sync-engine,
-            ingestion-engine,
-            model-engine,
-            transformation-engine,
-          ]
         include:
           - service: api
             pipeline: api-ci
@@ -66,25 +63,33 @@ jobs:
             pipeline: model-engine-ci
           - service: transformation-engine
             pipeline: transformation-engine-ci
-    if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install uv
+      - name: Install uv (if needed)
         run: |
-          curl -sSfL https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz | tar -xz
-          chmod +x uv && sudo mv uv /usr/local/bin/
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-      - name: Sync Python deps if needed
+      - name: Install Dagger CLI
         run: |
-          if [ -f pyproject.toml ]; then
+          curl -L https://dl.dagger.io/dagger/install.sh | sh
+          echo "$HOME/.dagger/bin" >> $GITHUB_PATH
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Sync Python deps if pyproject exists
+        run: |
+          if [ -f "pyproject.toml" ]; then
             uv sync
           fi
 
-      - name: Install Dagger
+      - name: Run Dagger pipeline for ${{ matrix.service }}
+        if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
         run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz | tar -xz
-          chmod +x dagger && sudo mv dagger /usr/local/bin/
-
-      - name: Run ${{ matrix.pipeline }}
-        run: dagger run python infra/dagger/cli.py ${{ matrix.pipeline }}
+          dagger run python infra/dagger/cli.py ${{ matrix.pipeline }}
