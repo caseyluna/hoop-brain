@@ -37,11 +37,26 @@ pipelines:
       - sync-engine: [run-main]
       - api: [integration-test]
 
-  ci-all:
+  api-ci:
     steps:
-      - api: [lint, typecheck, integration-test]
-      - sync-engine: [lint, typecheck, test, coverage]
-      - ingestion-engine: [lint, typecheck, test, coverage]
-      - model-engine: [lint, typecheck, test, coverage]
-      - transformation-engine: [dbt-parse, dbt-deps, dbt-test]
+      - api: [lint, typecheck, coverage, integration-test]
+
+  web-ci:
+    steps:
       - web: [lint, typecheck, test]
+
+  sync-engine-ci:
+    steps:
+      - sync-engine: [lint, typecheck, test, coverage]
+
+  ingestion-engine-ci:
+    steps:
+      - ingestion-engine: [lint, typecheck, test, coverage]
+
+  model-engine-ci:
+    steps:
+      - model-engine: [lint, typecheck, test, coverage]
+
+  transformation-engine-ci:
+    steps:
+      - transformation-engine: [dbt-parse, dbt-deps, dbt-test]

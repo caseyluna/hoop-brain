@@ -3,7 +3,8 @@ version: "3"
 vars:
   SERVICE_NAME: transformation-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} dbt
+  PROFILES_DIR: --profiles-dr /app/profiles
   ENV_FILE: .env.test
 
 tasks:
@@ -12,21 +13,35 @@ tasks:
     cmds:
       - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
 
-  lint:
-    desc: Run lint check for {{.SERVICE_NAME}}
+  dbt-parse:
+    desc: Run dbt-parse for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff format --check ."
+      - "{{.DOCKER_RUN}} parse {{.PROFILES_DIR}}"
 
-  typecheck:
-    desc: Run typecheck for {{.SERVICE_NAME}}
+  dbt-deps:
+    desc: Run dbt-deps for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff --check ."
+      - "{{.DOCKER_RUN}} deps {{.PROFILES_DIR}}"
+
+  dbt-test:
+    desc: Run dbt-test for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} test {{.PROFILES_DIR}}"
+
+  dbt-build:
+    desc: Run dbt-build for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} build {{.PROFILES_DIR}}"
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - task lint
-      - task typecheck
+      - task dbt-parse
+      - task dbt-deps
+      - task dbt-test
+      - task dbt-build
