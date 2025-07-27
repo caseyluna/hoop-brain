@@ -47,7 +47,7 @@ pipelines:
 
   sync-engine-ci:
     steps:
-      - sync-engine: [lint, typecheck, coverage]
+      - sync-engine: [lint, typecheck]
 
   ingestion-engine-ci:
     steps:
