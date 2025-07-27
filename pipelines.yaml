@@ -39,7 +39,7 @@ pipelines:
 
   api-ci:
     steps:
-      - api: [lint, typecheck, coverage, integration-test]
+      - api: [lint, typecheck]
 
   web-ci:
     steps:

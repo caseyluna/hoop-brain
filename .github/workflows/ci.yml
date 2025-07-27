@@ -2,12 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  ci:
+  service-ci:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,44 +23,119 @@ jobs:
           - transformation-engine
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1) Create the keys folder & write your service account
       - name: Configure GCP credentials
         run: |
           mkdir -p keys
-          echo "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
+          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
+            printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
+          else
+            touch keys/service_account.json
+          fi
 
-      # 2) Install Python & CLI deps
-      - name: Set up Python & install CLI deps
+      - name: Generate DBT profiles
+        run: |
+          mkdir -p pipelines/transformation-engine/profiles
+          echo "default:" > pipelines/transformation-engine/profiles/profiles.yml
+          echo "  outputs:" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "    dev:" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      type: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      threads: 1" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      host: db" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      port: 5432" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      user: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      pass: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      dbname: hoopbrain_test" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      schema: public" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "  target: dev" >> pipelines/transformation-engine/profiles/profiles.yml
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install dagger-io anyio pyyaml python-dotenv
 
-      # 3) Install the Dagger binary
+      - name: Install CLI Python packages
+        run: pip install dagger-io anyio pyyaml python-dotenv
+
       - name: Install Dagger CLI
         run: |
           curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
             | tar -xz dagger
           sudo mv dagger /usr/local/bin/
 
-      # 4) uv sync for Python services
-      - name: uv sync (if needed)
+      - name: uv sync if needed
         run: |
           SRCDIR="${{ matrix.service }}"
           if [ -f "$SRCDIR/pyproject.toml" ] || [ -f "pipelines/$SRCDIR/pyproject.toml" ]; then
             curl -LsSf https://astral.sh/uv/install.sh | sh
             export PATH="$HOME/.cargo/bin:$PATH"
             if [ -d "pipelines/$SRCDIR" ]; then
-              cd "pipelines/$SRCDIR"
+              cd pipelines/$SRCDIR
             else
               cd "$SRCDIR"
             fi
             uv sync
           fi
 
-      # 5) Run the service's Dagger pipeline
+      - name: List files for debugging
+        run: ls -lR
+
       - name: Run ${{ matrix.service }} pipeline
-        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        run: |
+          dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: service-ci
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure GCP credentials
+        run: |
+          mkdir -p keys
+          if [ -n "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" ]; then
+            printf '%s' "${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}" > keys/service_account.json
+          else
+            touch keys/service_account.json
+          fi
+
+      - name: Generate DBT profiles
+        run: |
+          mkdir -p pipelines/transformation-engine/profiles
+          echo "default:" > pipelines/transformation-engine/profiles/profiles.yml
+          echo "  outputs:" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "    dev:" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      type: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      threads: 1" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      host: db" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      port: 5432" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      user: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      pass: postgres" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      dbname: hoopbrain_test" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "      schema: public" >> pipelines/transformation-engine/profiles/profiles.yml
+          echo "  target: dev" >> pipelines/transformation-engine/profiles/profiles.yml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CLI Python packages
+        run: pip install dagger-io anyio pyyaml python-dotenv
+
+      - name: Install Dagger CLI
+        run: |
+          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+            | tar -xz dagger
+          sudo mv dagger /usr/local/bin/
+
+      - name: List files for debugging
+        run: ls -lR
+
+      - name: Run Integration Test pipeline
+        run: |
+          dagger run python infra/dagger/cli.py integration-test
