@@ -1,102 +1,90 @@
-name: Dagger CI
+name: CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
 
 jobs:
-  api:
-    name: API CI
+  detect-changes:
     runs-on: ubuntu-latest
+    outputs:
+      changed_services: ${{ steps.set-changes.outputs.changed_services }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - uses: arduino/setup-task@v2
-
-      - name: Install dagger + uv
+      - id: set-changes
         run: |
-          pip install uv
-          curl -L https://dl.dagger.io/dagger/install.sh | sh
+          git fetch origin main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          SERVICES=()
+          if echo "$CHANGED_FILES" | grep -q '^pipelines/ingestion-engine/'; then
+            SERVICES+=("ingestion-engine")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^pipelines/model-engine/'; then
+            SERVICES+=("model-engine")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^pipelines/transformation-engine/'; then
+            SERVICES+=("transformation-engine")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^pipelines/sync-engine/'; then
+            SERVICES+=("sync-engine")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^api/'; then
+            SERVICES+=("api")
+          fi
+          if echo "$CHANGED_FILES" | grep -q '^web/'; then
+            SERVICES+=("web")
+          fi
+          echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
 
-      - name: Run API pipeline
-        run: dagger run python infra/dagger/cli.py api-ci
-
-  web:
-    name: Web CI
+  code-checks:
+    needs: detect-changes
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          [
+            api,
+            web,
+            sync-engine,
+            ingestion-engine,
+            model-engine,
+            transformation-engine,
+          ]
+        include:
+          - service: api
+            pipeline: api-ci
+          - service: web
+            pipeline: web-ci
+          - service: sync-engine
+            pipeline: sync-engine-ci
+          - service: ingestion-engine
+            pipeline: ingestion-engine-ci
+          - service: model-engine
+            pipeline: model-engine-ci
+          - service: transformation-engine
+            pipeline: transformation-engine-ci
+    if: contains(needs.detect-changes.outputs.changed_services, matrix.service)
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
+      - name: Install uv
+        run: |
+          curl -sSfL https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+          chmod +x uv && sudo mv uv /usr/local/bin/
 
-      - uses: arduino/setup-task@v2
+      - name: Sync Python deps if needed
+        run: |
+          if [ -f pyproject.toml ]; then
+            uv sync
+          fi
 
-      - name: Install dagger
-        run: curl -L https://dl.dagger.io/dagger/install.sh | sh
+      - name: Install Dagger
+        run: |
+          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz | tar -xz
+          chmod +x dagger && sudo mv dagger /usr/local/bin/
 
-      - name: Run Web pipeline
-        run: dagger run python infra/dagger/cli.py web-ci
-
-  sync-engine:
-    name: Sync Engine CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - uses: arduino/setup-task@v2
-      - run: pip install uv
-      - run: curl -L https://dl.dagger.io/dagger/install.sh | sh
-      - run: dagger run python infra/dagger/cli.py sync-engine-ci
-
-  ingestion-engine:
-    name: Ingestion Engine CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - uses: arduino/setup-task@v2
-      - run: pip install uv
-      - run: curl -L https://dl.dagger.io/dagger/install.sh | sh
-      - run: dagger run python infra/dagger/cli.py ingestion-engine-ci
-
-  model-engine:
-    name: Model Engine CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - uses: arduino/setup-task@v2
-      - run: pip install uv
-      - run: curl -L https://dl.dagger.io/dagger/install.sh | sh
-      - run: dagger run python infra/dagger/cli.py model-engine-ci
-
-  transformation-engine:
-    name: Transformation Engine CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - uses: arduino/setup-task@v2
-      - run: pip install dbt-core dbt-bigquery uv
-      - run: curl -L https://dl.dagger.io/dagger/install.sh | sh
-      - run: dagger run python infra/dagger/cli.py transformation-engine-ci
+      - name: Run ${{ matrix.pipeline }}
+        run: dagger run python infra/dagger/cli.py ${{ matrix.pipeline }}
