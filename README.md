@@ -9,6 +9,7 @@ when you create a new table in the db you also have to run alembic in the api se
 
 TODOs:
 
+- Clean up dagger setup and optimize GHA (run in parallel, only when certain code changes, etc)
 - Clean up API and front end code - make it clearer where to add stuff
 - Automate adding new tables and alembic migrations
 - Add tests and comments everywhere
