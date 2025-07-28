@@ -1,0 +1,30 @@
+repos:
+  # 🐍 Python linting & formatting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.8
+    hooks:
+      - id: ruff
+        args: [--fix]
+        types: [python]
+        files: ^(pipelines|api)/
+      - id: ruff-format
+        types: [python]
+        files: ^(pipelines|api)/
+
+  # 📦 Generic file hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^(pipelines|api|web)/
+      - id: end-of-file-fixer
+        files: ^(pipelines|api|web)/
+      - id: check-yaml
+        files: \.ya?ml$
+
+  # 🔐 Secrets scanning
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        files: ^(pipelines|api|web)/

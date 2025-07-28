@@ -1,4 +1,0 @@
-app
-core
-health
-modules

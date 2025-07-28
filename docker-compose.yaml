@@ -1,0 +1,79 @@
+services:
+  db:
+    build:
+      context: ./db/postgres
+    container_name: hoopbrain-postgres
+    restart: always
+    env_file:
+      - .env.test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - hoopbrain
+
+  api:
+    build:
+      context: ./api
+    container_name: hoopbrain-api
+    env_file:
+      - .env.test
+    environment:
+      - PYTHONPATH=/app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api/alembic/versions:/app/alembic/versions
+    depends_on:
+      - db
+    networks:
+      - hoopbrain
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    env_file:
+      - .env.test
+    container_name: hoopbrain-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: npm run dev
+    depends_on:
+      - api
+    networks:
+      - hoopbrain
+
+  sync-engine:
+    build:
+      context: ./pipelines/sync-engine
+    container_name: sync-engine
+    env_file:
+      - .env.test
+    volumes:
+      - ./pipelines/sync-engine:/app
+      - /Users/caseythayer/projects/hoop-brain/keys:/keys:ro
+    depends_on:
+      - db
+    working_dir: /app
+    entrypoint: ["/bin/bash"]
+    stdin_open: true
+    tty: true
+    networks:
+      - hoopbrain
+
+volumes:
+  postgres_data:
+
+networks:
+  hoopbrain:

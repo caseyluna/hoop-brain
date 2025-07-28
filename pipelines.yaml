@@ -1,0 +1,62 @@
+# pipelines.yaml
+pipelines:
+  lint-all:
+    steps:
+      - api: [lint]
+      - sync-engine: [lint]
+      - ingestion-engine: [lint]
+      - model-engine: [lint]
+      - transformation-engine: [dbt-parse]
+      - web: [lint]
+
+  typecheck-all:
+    steps:
+      - api: [typecheck]
+      - sync-engine: [typecheck]
+      - ingestion-engine: [typecheck]
+      - model-engine: [typecheck]
+      - web: [typecheck]
+
+  coverage-all:
+    steps:
+      - sync-engine: [coverage]
+      - ingestion-engine: [coverage]
+      - model-engine: [coverage]
+
+  test-all:
+    steps:
+      - sync-engine: [test]
+      - ingestion-engine: [test]
+      - model-engine: [test]
+      - web: [test]
+      - transformation-engine: [dbt-test]
+
+  integration-test:
+    steps:
+      - api: [migrate-test]
+      - sync-engine: [run-main]
+      - api: [integration-test]
+
+  api-ci:
+    steps:
+      - api: [lint, typecheck]
+
+  web-ci:
+    steps:
+      - web: [lint, typecheck, test]
+
+  sync-engine-ci:
+    steps:
+      - sync-engine: [lint, typecheck]
+
+  ingestion-engine-ci:
+    steps:
+      - ingestion-engine: [lint, typecheck, test, coverage]
+
+  model-engine-ci:
+    steps:
+      - model-engine: [lint, typecheck, test, coverage]
+
+  transformation-engine-ci:
+    steps:
+      - transformation-engine: [dbt-parse, dbt-deps, dbt-test]

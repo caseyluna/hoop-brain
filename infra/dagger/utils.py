@@ -1,3 +1,5 @@
+# infra/dagger/utils.py
+
 import re
 from typing import Any, Dict, List
 
@@ -7,11 +9,37 @@ from rich.panel import Panel
 console = Console()
 
 
-async def pretty_print(service: str, check: str, content: str) -> None:
+def flatten_results(results):
     """
-    Pretty print the output of a check with rich panels.
+    Flattens a list of results that may contain nested lists or None
+    Returns a flat list of non-None results.
     """
-    header = f"[bold yellow]{check.upper()}[/]"
+    if not results:
+        return []
+    flat = []
+    for sub in results:
+        if sub is None:
+            continue
+        if isinstance(sub, list):
+            flat.extend(flatten_results(sub))
+        else:
+            flat.append(sub)
+    return flat
+
+
+def status_emoji(passed: bool) -> str:
+    """
+    Returns a status emoji based on whether the check passed or failed.
+    return '✅ PASSED' if passed else '❌ FAILED'
+    """
+    return "✅ PASSED" if passed else "❌ FAILED"
+
+
+async def pretty_print(service: str, action: str, content: str) -> None:
+    """
+    Pretty print the output of a check or job with rich panels.
+    """
+    header = f"[bold yellow]{action.upper()}[/]"
     panel = Panel.fit(content.strip(), title=header, border_style="green")
     console.print(panel)
 
@@ -42,7 +70,6 @@ def check_passed(output: str) -> bool:
         if "warning: no packages were found" in lower_output:
             return True
         if "performance info" in lower_output and "error" not in lower_output:
-            # dbt parse success fallback
             return True
         return False
 
@@ -70,14 +97,75 @@ def check_passed(output: str) -> bool:
     return True
 
 
-def print_ci_summary(results: List[Dict[str, Any]], total_time: float) -> None:
+def print_summary(
+    results: List[Dict[str, Any]], total_time: float, title: str = "Run Summary"
+) -> None:
     """
-    Print a summary of all CI checks.
+    Print a summary of all checks, jobs, or other actions
     """
-    console.rule("[bold magenta]CI Summary[/bold magenta]")
+    console = Console()
+    console.rule(f"[bold magenta]{title}[/bold magenta]")
     for r in results:
+        # prefer 'check', then 'job', then fallback to any action key
+        action = r.get("check") or r.get("job") or r.get("action") or "unknown"
+
         console.print(
-            f"[cyan]{r['service']}[/] | [yellow]{r['check']}[/]: {r['status']} "
-            f"⏱ {r['elapsed']:.2f}s"
+            f"[cyan]{r.get('service', '?')}[/] | [yellow]{action}[/]: {r.get('status', '?')} "
+            f"⏱ {r.get('elapsed', 0):.2f}s"
         )
-    console.print(f"\n🔥 Total CI time: {total_time:.2f}s\n")
+    console.print(f"\n🔥 Total time: {total_time:.2f}s\n")
+
+
+def validate_services_config(services_config):
+    """
+    Validates the structure of the services config.
+    Raises ValueError if the config is invalid.
+    """
+    if not isinstance(services_config, dict):
+        raise ValueError("Services config must be a dictionary.")
+    for name, conf in services_config.items():
+        if not isinstance(conf, dict):
+            raise ValueError(f"Service '{name}' config must be a dictionary.")
+        for field in ("type", "src_dir"):
+            if field not in conf:
+                raise ValueError(
+                    f"Service '{name}' is missing required field '{field}'."
+                )
+        deps = conf.get("dependencies", [])
+        if not isinstance(deps, list):
+            raise ValueError(f"Service '{name}' dependencies must be a list.")
+        for section in ("checks", "jobs"):
+            val = conf.get(section, {})
+            if not isinstance(val, dict):
+                raise ValueError(f"Service '{name}' '{section}' must be a dictionary.")
+
+
+def validate_pipelines_config(pipelines_config, services_config):
+    """
+    Validates the structure of the pipelines config.
+    Raises ValueError if the config is invalid.
+    """
+    if not isinstance(pipelines_config, dict):
+        raise ValueError("Pipelines config must be a dictionary.")
+    for name, conf in pipelines_config.items():
+        if not isinstance(conf, dict):
+            raise ValueError(f"Pipeline '{name}' config must be a dictionary.")
+        if "services" in conf:
+            for svc in conf["services"]:
+                if svc not in services_config:
+                    raise ValueError(
+                        f"Pipeline '{name}' references unknown service '{svc}'."
+                    )
+        if "steps" in conf:
+            for step in conf["steps"]:
+                if not isinstance(step, dict):
+                    raise ValueError(f"Pipeline '{name}' step must be a dict.")
+                for svc, actions in step.items():
+                    if svc not in services_config:
+                        raise ValueError(
+                            f"Pipeline '{name}' step references unknown service '{svc}'."
+                        )
+                    if not isinstance(actions, list):
+                        raise ValueError(
+                            f"Pipeline '{name}' step actions for service '{svc}' must be a list."
+                        )

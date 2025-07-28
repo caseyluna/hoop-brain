@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  service-ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api
+          - web
+          - sync-engine
+          - ingestion-engine
+          - model-engine
+          - transformation-engine
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare dummy GCP credentials
+        run: |
+          mkdir -p keys
+          echo '{}' > keys/service_account.json
+
+      - name: Ensure DBT profiles (transformation-engine only)
+        if: ${{ matrix.service == 'transformation-engine' }}
+        run: |
+          mkdir -p pipelines/transformation-engine/profiles
+          cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
+          transformation_engine:
+            outputs:
+              dev:
+                type: postgres
+                threads: 1
+                host: db
+                port: 5432
+                user: postgres
+                pass: postgres
+                dbname: hoopbrain_test
+                schema: public
+            target: dev
+          EOF
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CLI Python packages
+        run: pip install dagger-io anyio pyyaml python-dotenv
+
+      - name: Install Dagger CLI
+        run: |
+          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+            | tar -xz dagger
+          sudo mv dagger /usr/local/bin/
+
+      - name: uv sync if needed
+        run: |
+          SRCDIR="${{ matrix.service }}"
+          if [ -f "$SRCDIR/pyproject.toml" ] || [ -f "pipelines/$SRCDIR/pyproject.toml" ]; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            export PATH="$HOME/.cargo/bin:$PATH"
+            if [ -d "pipelines/$SRCDIR" ]; then
+              cd pipelines/$SRCDIR
+            else
+              cd "$SRCDIR"
+            fi
+            uv sync
+          fi
+
+      - name: Run ${{ matrix.service }} pipeline
+        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
+
+  integration-test:
+    name: Integration Test
+    needs: service-ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare real GCP credentials
+        run: |
+          if [ -z "${GCP_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT_JSON must be set"
+            exit 1
+          fi
+          mkdir -p keys
+          cat << 'EOF' > keys/service_account.json
+          ${GCP_SERVICE_ACCOUNT_JSON}
+          EOF
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+
+      - name: Ensure DBT profiles
+        run: |
+          mkdir -p pipelines/transformation-engine/profiles
+          cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
+          transformation_engine:
+            outputs:
+              dev:
+                type: postgres
+                threads: 1
+                host: db
+                port: 5432
+                user: postgres
+                pass: postgres
+                dbname: hoopbrain_test
+                schema: public
+            target: dev
+          EOF
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CLI Python packages
+        run: pip install dagger-io anyio pyyaml python-dotenv
+
+      - name: Install Dagger CLI
+        run: |
+          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+            | tar -xz dagger
+          sudo mv dagger /usr/local/bin/
+
+      - name: Run Integration Test pipeline
+        run: dagger run python infra/dagger/cli.py integration-test
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}

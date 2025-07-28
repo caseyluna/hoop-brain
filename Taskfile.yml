@@ -1,26 +1,54 @@
 version: "3"
 
 vars:
-  DAGGER_SCRIPT: "infra/dagger/run_ci_pipeline.py"
+  DAGGER_SCRIPT: "infra/dagger/cli.py"
   DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
+  ENV_FILE: .env.test
 
 includes:
   ingestion:
-    taskfile: ./backend/ingestion-engine/Taskfile.yml
-    dir: ./backend/ingestion-engine
+    taskfile: ./pipelines/ingestion-engine/Taskfile.yml
+    dir: ./pipelines/ingestion-engine
 
   model:
-    taskfile: ./backend/model-engine/Taskfile.yml
-    dir: ./backend/model-engine
+    taskfile: ./pipelines/model-engine/Taskfile.yml
+    dir: ./pipelines/model-engine
+
+  sync:
+    taskfile: ./pipelines/sync-engine/Taskfile.yml
+    dir: ./pipelines/sync-engine
 
   transformation:
-    taskfile: ./backend/transformation-engine/Taskfile.yml
-    dir: ./backend/transformation-engine
+    taskfile: ./pipelines/transformation-engine/Taskfile.yml
+    dir: ./pipelines/transformation-engine
+
+  api:
+    taskfile: ./api/Taskfile.yml
+    dir: ./api
+
+  web:
+    taskfile: ./web/Taskfile.yml
+    dir: ./web
 
 tasks:
-  all-checks:
-    desc: Run all checks on all services sequentially
+  # Dagger based pipelines for CI and cross service orchestration
+  lint:
+    desc: Run lint for all servies with Dagger
     cmds:
-      - task ingestion:all-checks
-      - task model:all-checks
-      - task transformation:all-checks
+      - "{{.DAGGER_RUN}} lint-all"
+  typecheck:
+    desc: Run typecheck for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} typecheck-all"
+  test:
+    desc: Run tests for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} test-all"
+  coverage:
+    desc: Run coverage for all servies with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} coverage-all"
+  integration-test:
+    desc: Run API integration test with Dagger
+    cmds:
+      - "{{.DAGGER_RUN}} integration-test"

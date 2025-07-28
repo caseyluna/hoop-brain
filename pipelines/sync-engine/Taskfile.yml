@@ -1,0 +1,46 @@
+version: "3"
+
+vars:
+  SERVICE_NAME: sync-engine
+  IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
+  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  ENV_FILE: .env.test
+
+tasks:
+  build:
+    desc: build local docker image for api (if needed)
+    cmds:
+      - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
+
+  lint:
+    desc: Run lint check for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} ruff format --check ."
+
+  typecheck:
+    desc: Run typecheck for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} ruff --check ."
+
+  test:
+    desc: Run tests for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} pytest tests"
+
+  coverage:
+    desc: Run coverage for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - "{{.DOCKER_RUN}} pytest --cov=ingestion_engine --cov-report=html:coverage.html tests"
+
+  all-checks:
+    desc: Run all CI checks for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - task lint
+      - task typecheck
+      - task test
+      - task coverage
