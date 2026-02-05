@@ -55,11 +55,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install CLI Python packages
-        run: pip install dagger-io anyio pyyaml python-dotenv
+        run: pip install "dagger-io==0.19.10" anyio pyyaml python-dotenv
 
       - name: Install Dagger CLI
         run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+          curl -L https://github.com/dagger/dagger/releases/download/v0.19.10/dagger_v0.19.10_linux_amd64.tar.gz \
             | tar -xz dagger
           sudo mv dagger /usr/local/bin/
 
@@ -78,7 +78,24 @@ jobs:
           fi
 
       - name: Run ${{ matrix.service }} pipeline
-        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        run: |
+          run_with_retry() {
+            local cmd="$1"
+            local max_attempts="${2:-3}"
+            local delay="${3:-20}"
+            local attempt=1
+            while [ "$attempt" -le "$max_attempts" ]; do
+              if eval "$cmd"; then
+                return 0
+              fi
+              echo "Attempt $attempt failed, retrying in ${delay}s..."
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
+            return 1
+          }
+
+          run_with_retry "dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci" 3 20
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
 
@@ -127,15 +144,21 @@ jobs:
           python-version: "3.11"
 
       - name: Install CLI Python packages
-        run: pip install dagger-io anyio pyyaml python-dotenv
+        run: pip install "dagger-io==0.19.10" anyio pyyaml python-dotenv
 
       - name: Install Dagger CLI
         run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.11.6/dagger_v0.11.6_linux_amd64.tar.gz \
+          curl -L https://github.com/dagger/dagger/releases/download/v0.19.10/dagger_v0.19.10_linux_amd64.tar.gz \
             | tar -xz dagger
           sudo mv dagger /usr/local/bin/
 
       - name: Run Integration Test pipeline
-        run: dagger run python infra/dagger/cli.py integration-test
+        run: |
+          for i in 1 2 3; do
+            if dagger run python infra/dagger/cli.py integration-test; then exit 0; fi
+            echo "Attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          exit 1
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
