@@ -4,9 +4,23 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "api/**"
+      - "web/**"
+      - "pipelines/**"
+      - "infra/**"
+      - "docker-compose.yaml"
+      - ".github/**"
   pull_request:
     branches:
       - main
+    paths:
+      - "api/**"
+      - "web/**"
+      - "pipelines/**"
+      - "infra/**"
+      - "docker-compose.yaml"
+      - ".github/**"
 
 jobs:
   service-ci:
