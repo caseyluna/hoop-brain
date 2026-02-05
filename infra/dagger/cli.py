@@ -52,12 +52,9 @@ def build_arg_parser():
 
 async def start_db_service(client: dagger.Client, db_url: str):
     db_conf = SERVICES["db"]
+    ctx_dir = client.host().directory(db_conf["src_dir"])
     container = (
-        client.container()
-        .build(
-            context=client.host().directory(db_conf["src_dir"]),
-            dockerfile=db_conf.get("dockerfile", "Dockerfile"),
-        )
+        ctx_dir.docker_build(dockerfile=db_conf.get("dockerfile", "Dockerfile"))
         .with_env_variable("POSTGRES_DB", db_url.rsplit("/", 1)[-1])
         .with_env_variable("POSTGRES_USER", "postgres")
         .with_env_variable("POSTGRES_PASSWORD", "postgres")
@@ -75,10 +72,8 @@ async def run_job(
     db_service: dagger.Container = None,
 ):
     conf = SERVICES[service]
-    container = client.container().build(
-        context=client.host().directory(conf["src_dir"]),
-        dockerfile=conf.get("dockerfile", "Dockerfile"),
-    )
+    ctx_dir = client.host().directory(conf["src_dir"])
+    container = ctx_dir.docker_build(dockerfile=conf.get("dockerfile", "Dockerfile"))
 
     # Mount the GCP key file via Dagger secret
     # (we'll register the secret in main())
