@@ -55,7 +55,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install CLI Python packages
-        run: pip install dagger-io anyio pyyaml python-dotenv
+        run: pip install "dagger-io==0.11.6" anyio pyyaml python-dotenv
 
       - name: Install Dagger CLI
         run: |
@@ -133,7 +133,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install CLI Python packages
-        run: pip install dagger-io anyio pyyaml python-dotenv
+        run: pip install "dagger-io==0.11.6" anyio pyyaml python-dotenv
 
       - name: Install Dagger CLI
         run: |
