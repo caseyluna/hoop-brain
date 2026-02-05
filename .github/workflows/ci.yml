@@ -59,7 +59,7 @@ jobs:
 
       - name: Install Dagger CLI
         run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.19.14/dagger_v0.18.14_linux_amd64.tar.gz \
+          curl -L https://github.com/dagger/dagger/releases/download/v0.19.10/dagger_v0.19.10_linux_amd64.tar.gz \
             | tar -xz dagger
           sudo mv dagger /usr/local/bin/
 
