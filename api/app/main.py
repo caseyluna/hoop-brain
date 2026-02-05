@@ -8,6 +8,13 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+@app.get("/health")
+def health():
+    """Health check for load balancers and monitoring."""
+    return {"status": "ok"}
+
+
 # Optional: CORS setup for dev/local web
 app.add_middleware(
     CORSMiddleware,
