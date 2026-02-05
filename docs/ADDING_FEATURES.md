@@ -41,10 +41,10 @@ For things like RAPM, BPM, surplus value—anything that reads from marts and wr
 
 | Step | What to do |
 |------|------------|
-| 1. Route | Create `api/app/api/routes/<resource>.py`. Define `@router.get("/")` or `@router.get("/{id}")` etc. |
-| 2. Schema | Add `api/app/schemas/<resource>.py` with Pydantic models. Use `from_attributes=True` for ORM. |
-| 3. Model | If it's a new table, add `api/app/models/<resource>.py` and an Alembic migration. |
-| 4. Register | In `api/app/api/api_v1/api.py`: `router.include_router(<resource>.router, prefix="/<resource>", tags=["<resource>"])` |
+| 1. Route | Create `api/app/api/routes/<module_name>.py` (e.g. `teams.py`). Define `@router.get("/")` or `@router.get("/{id}")` etc. |
+| 2. Schema | Add `api/app/schemas/<module_name>.py` with Pydantic models. Use `from_attributes=True` for ORM. |
+| 3. Model | If it's a new table, add `api/app/models/<module_name>.py` and an Alembic migration. |
+| 4. Register | In `api/app/api/api_v1/api.py`: `from app.api.routes import <module_name>` then `router.include_router(<module_name>.router, prefix="/<resource>", tags=["<resource>"])` (e.g. module `teams` → prefix `/teams`). |
 | 5. Test | Add `api/tests/test_<resource>.py`. Assert status and shape. |
 
 ---
