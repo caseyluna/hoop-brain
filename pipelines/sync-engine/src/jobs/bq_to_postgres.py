@@ -29,7 +29,7 @@ class BQToPostgresJob(BaseJob):
 
     def run(self) -> None:
         logger.info(
-            "Syncing BQ view `{self.bq_view}` -> Postgres table `{self.pg_table}`"
+            f"Syncing BQ view `{self.bq_view}` -> Postgres table `{self.pg_table}`"
         )
         if self.dry_run:
             logger.info(f"[DRY RUN] Would sync {self.bq_view} to {self.pg_table}")

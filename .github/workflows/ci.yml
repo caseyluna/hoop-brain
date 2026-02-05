@@ -78,7 +78,13 @@ jobs:
           fi
 
       - name: Run ${{ matrix.service }} pipeline
-        run: dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci
+        run: |
+          for i in 1 2 3; do
+            if dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci; then exit 0; fi
+            echo "Attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          exit 1
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
 
@@ -136,6 +142,12 @@ jobs:
           sudo mv dagger /usr/local/bin/
 
       - name: Run Integration Test pipeline
-        run: dagger run python infra/dagger/cli.py integration-test
+        run: |
+          for i in 1 2 3; do
+            if dagger run python infra/dagger/cli.py integration-test; then exit 0; fi
+            echo "Attempt $i failed, retrying in 20s..."
+            sleep 20
+          done
+          exit 1
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}

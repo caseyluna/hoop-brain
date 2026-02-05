@@ -2,20 +2,20 @@
 import React, { useEffect, useState } from "react";
 
 type Team = {
-  id: string;
+  id: number;
   full_name: string;
   abbreviation: string;
   nickname: string;
   city: string;
   state: string;
-  year_founded: string;
+  year_founded: number;
 };
 
 const TeamsTable = () => {
   const [teams, setTeams] = useState<Team[]>([]);
 
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/teams/") // adjust this if behind a proxy
+    fetch("/api/v1/teams/")
       .then((res) => res.json())
       .then((data) => setTeams(data));
   }, []);

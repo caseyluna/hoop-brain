@@ -158,14 +158,11 @@ async def main():
 
     db_url = PROD_DB_URL if args.env == "prod" else TEST_DB_URL
 
-    # Ensure the env var is set
-    sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON")
-    if not sa_json:
-        print("ERROR: GCP_SERVICE_ACCOUNT_JSON env var not set")
-        sys.exit(1)
+    # GCP creds optional for lint/typecheck; use empty object if not set
+    # Jobs that need BQ/GCS will fail with a clear error from the client
+    sa_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON", "{}")
 
     async with dagger.Connection() as client:
-        # Register the JSON string as a Dagger secret
         client.set_secret("GCP_SA_JSON", sa_json)
 
         overall_start = time.perf_counter()

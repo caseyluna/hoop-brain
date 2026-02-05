@@ -4,13 +4,13 @@ import { describe, it, vi, beforeEach } from "vitest";
 
 const mockTeams = [
   {
-    id: "1",
+    id: 1,
     full_name: "Boston Celtics",
     abbreviation: "BOS",
     nickname: "Celtics",
     city: "Boston",
     state: "MA",
-    year_founded: "1946",
+    year_founded: 1946,
   },
 ];
 
