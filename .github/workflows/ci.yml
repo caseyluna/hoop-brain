@@ -79,12 +79,23 @@ jobs:
 
       - name: Run ${{ matrix.service }} pipeline
         run: |
-          for i in 1 2 3; do
-            if dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci; then exit 0; fi
-            echo "Attempt $i failed, retrying in 20s..."
-            sleep 20
-          done
-          exit 1
+          run_with_retry() {
+            local cmd="$1"
+            local max_attempts="${2:-3}"
+            local delay="${3:-20}"
+            local attempt=1
+            while [ "$attempt" -le "$max_attempts" ]; do
+              if eval "$cmd"; then
+                return 0
+              fi
+              echo "Attempt $attempt failed, retrying in ${delay}s..."
+              sleep "$delay"
+              attempt=$((attempt + 1))
+            done
+            return 1
+          }
+
+          run_with_retry "dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci" 3 20
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
 
