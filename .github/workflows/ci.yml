@@ -97,9 +97,7 @@ jobs:
             exit 1
           fi
           mkdir -p keys
-          cat << 'EOF' > keys/service_account.json
-          ${GCP_SERVICE_ACCOUNT_JSON}
-          EOF
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > keys/service_account.json
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
