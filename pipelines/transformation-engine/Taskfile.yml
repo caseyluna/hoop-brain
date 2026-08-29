@@ -3,7 +3,7 @@ version: "3"
 vars:
   SERVICE_NAME: transformation-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} dbt
+  DOCKER_RUN: docker run --rm -v $PWD:/app -v /app/.venv -w /app {{.IMAGE_NAME}} dbt
   PROFILES_DIR: --profiles-dir /app/profiles
   ENV_FILE: .env.test
 
@@ -34,11 +34,10 @@ tasks:
       - "{{.DOCKER_RUN}} build {{.PROFILES_DIR}}"
 
   ci:
-    desc: Run CI checks for {{.SERVICE_NAME}}
+    desc: Run CI checks for {{.SERVICE_NAME}} (no live BQ connection needed/available here — see root `integration-test` for dbt-build/dbt-test against real BigQuery)
     cmds:
       - task: dbt-parse
       - task: dbt-deps
-      - task: dbt-test
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}

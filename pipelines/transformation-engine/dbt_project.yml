@@ -7,7 +7,12 @@ profile: transformation_engine
 model-paths: ["models"]
 seed-paths: ["seeds"]
 test-paths: ["tests"]
+macro-paths: ["macros"]
 
 models:
   transformation_engine:
     +materialized: view
+    staging:
+      +schema: staging
+    marts:
+      +schema: marts

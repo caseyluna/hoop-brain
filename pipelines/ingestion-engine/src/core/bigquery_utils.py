@@ -9,9 +9,10 @@ def load_parquet_from_gcs(gcs_uri: str, dataset: str, table: str) -> None:
     """
     Load a Parquet file from GCS into a BigQuery table, replacing any existing rows.
 
-    Creates the destination dataset if it doesn't already exist. The destination
-    table is created automatically by the load job (schema comes from the Parquet
-    file itself) if it doesn't already exist.
+    Creates the destination dataset if it doesn't already exist. WRITE_TRUNCATE
+    replaces the destination table entirely (schema included) each run, so adding
+    or removing columns in the source Parquet file just works — no schema_update_options
+    needed (and BigQuery rejects them on a non-partitioned WRITE_TRUNCATE load anyway).
 
     Args:
         gcs_uri (str): GCS URI of the Parquet file (e.g. gs://bucket/path/file.parquet).

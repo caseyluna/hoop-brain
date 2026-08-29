@@ -41,8 +41,9 @@ jobs:
 
       - name: Prepare dummy GCP credentials
         run: |
-          mkdir -p keys
+          mkdir -p keys pipelines/transformation-engine/keys
           echo '{}' > keys/service_account.json
+          echo '{}' > pipelines/transformation-engine/keys/service_account.json
 
       - name: Ensure DBT profiles (transformation-engine only)
         if: ${{ matrix.service == 'transformation-engine' }}
@@ -52,14 +53,13 @@ jobs:
           transformation_engine:
             outputs:
               dev:
-                type: postgres
-                threads: 1
-                host: db
-                port: 5432
-                user: postgres
-                pass: postgres
-                dbname: hoopbrain_test
-                schema: public
+                type: bigquery
+                method: service-account
+                project: hoop-brain
+                dataset: test
+                threads: 4
+                timeout_seconds: 300
+                keyfile: /app/keys/service_account.json
             target: dev
           EOF
 
@@ -96,8 +96,9 @@ jobs:
             echo "::error::GCP_SERVICE_ACCOUNT_JSON must be set"
             exit 1
           fi
-          mkdir -p keys
+          mkdir -p keys pipelines/transformation-engine/keys
           printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > keys/service_account.json
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > pipelines/transformation-engine/keys/service_account.json
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
@@ -117,14 +118,13 @@ jobs:
           transformation_engine:
             outputs:
               dev:
-                type: postgres
-                threads: 1
-                host: db
-                port: 5432
-                user: postgres
-                pass: postgres
-                dbname: hoopbrain_test
-                schema: public
+                type: bigquery
+                method: service-account
+                project: hoop-brain
+                dataset: test
+                threads: 4
+                timeout_seconds: 300
+                keyfile: /app/keys/service_account.json
             target: dev
           EOF
 

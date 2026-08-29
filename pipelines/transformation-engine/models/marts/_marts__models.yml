@@ -1,0 +1,5 @@
+version: 2
+
+models:
+  - name: teams
+    description: NBA teams mart. Straight passthrough of stg_nba_api__teams — sync-engine's sync_jobs.yaml points its teams job at this view.

@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: nba_api
+    schema: raw_nba_api
+    tables:
+      - name: teams
+        description: Raw NBA team records, loaded from GCS Parquet via ingestion-engine's NBAApi.

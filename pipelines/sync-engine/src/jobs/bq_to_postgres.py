@@ -59,8 +59,20 @@ class BQToPostgresJob(BaseJob):
     def _atomic_swap(self, tmp_table: str) -> None:
         inspector = inspect(self.pg_engine)
         existing_tables = inspector.get_table_names()
+        pg_table_exists = self.pg_table in existing_tables
+
+        # Reflect column types before opening the swap transaction below — once
+        # that transaction truncates pg_table, a second pooled connection (which
+        # is what an Engine-bound inspector checks out to reflect) would block
+        # on the still-uncommitted TRUNCATE's lock, deadlocking against itself.
+        select_list = (
+            self._build_cast_select_list(inspector, tmp_table)
+            if pg_table_exists
+            else None
+        )
+
         with self.pg_engine.begin() as conn:
-            if self.pg_table in existing_tables:
+            if pg_table_exists:
                 logger.info(f"Truncating existing table {self.pg_table}")
                 conn.execute(text(f"TRUNCATE TABLE {self.pg_table}"))
             else:
@@ -69,8 +81,30 @@ class BQToPostgresJob(BaseJob):
                 return
             logger.info(f"Inserting into {self.pg_table} from {tmp_table}")
             conn.execute(
-                text(f'INSERT INTO "{self.pg_table}" SELECT * FROM "{tmp_table}"')
+                text(
+                    f'INSERT INTO "{self.pg_table}" SELECT {select_list} FROM "{tmp_table}"'
+                )
             )
 
             logger.info(f"Dropping temp table `{tmp_table}`")
             conn.execute(text(f'DROP TABLE IF EXISTS "{tmp_table}"'))
+
+    def _build_cast_select_list(self, inspector, tmp_table: str) -> str:
+        """
+        Build a SELECT list that casts each tmp_table column to the destination
+        table's actual Postgres column type.
+
+        write_to_postgres's auto-generated tmp table gets its types from
+        pandas/polars type inference (e.g. everything lands as plain text),
+        which won't match a richer destination type — a custom enum like
+        `league`, for instance — without an explicit cast.
+        """
+        tmp_columns = [col["name"] for col in inspector.get_columns(tmp_table)]
+        dest_types = {
+            col["name"]: col["type"].compile(dialect=self.pg_engine.dialect)
+            for col in inspector.get_columns(self.pg_table)
+        }
+        return ", ".join(
+            f'"{col}"::{dest_types[col]}' if col in dest_types else f'"{col}"'
+            for col in tmp_columns
+        )
