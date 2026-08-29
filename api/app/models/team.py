@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Enum, Integer, String
 
 from app.db.base import Base
+from app.models.enums import League
 
 
 class Team(Base):
@@ -13,3 +14,8 @@ class Team(Base):
     city = Column(String, nullable=False)
     state = Column(String, nullable=False)
     year_founded = Column(Integer, nullable=False)
+    league = Column(
+        Enum(League, name="league"),
+        nullable=False,
+        server_default=League.NBA.value,
+    )
