@@ -63,7 +63,7 @@ services:
       - .env.test
     volumes:
       - ./pipelines/sync-engine:/app
-      - /Users/caseythayer/projects/hoop-brain/keys:/keys:ro
+      - ./keys:/keys:ro
     depends_on:
       - db
     working_dir: /app
