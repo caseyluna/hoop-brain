@@ -21,7 +21,7 @@ When you want to pull in a new table from nba_api or elsewhere:
 | Step | What to do |
 |------|------------|
 | 1. Ingest | Add `get_*()` and `ingest_*()` in `pipelines/ingestion-engine/src/modules/nba_api.py` (or a new module for a new source). Call from `main.py`. Output: `nba-api/<table>.parquet` in GCS via `upload_bytes_to_gcs` (see `core/storage_utils.py`). |
-| 2. Load into BQ | **Gap today:** there's no repo script for this — load manually with the `bq` CLI until one exists: `bq load --source_format=PARQUET raw_nba_api.<table> gs://hoop-brain-raw-data/nba-api/<table>.parquet`. Creating a real load step (`ingestion-engine` job or standalone script) is worthwhile future ticket-sized work, not something to invent ad hoc mid-feature. |
+| 2. Load into BQ | Have your `ingest_*()` call `load_to_bq(filename=...)` after `upload()` (see `NBAApi.ingest_teams()`). It loads the just-uploaded Parquet file straight into `raw_<vendor>.<table>` via `core/bigquery_utils.py`'s `load_parquet_from_gcs` — creates the `raw_<vendor>` dataset if needed, replaces the table's rows (`WRITE_TRUNCATE`) each run. No manual `bq` CLI step required. |
 | 3. Staging | Create `models/staging/stg_<table>.sql` in transformation-engine. Add the source to `sources.yml`. Dedupe by primary key. Add the uniqueness/not-null schema tests on that key (see CLAUDE.md testing conventions). |
 | 4. Mart | Create `models/marts/<table>.sql` (or merge into an existing mart). |
 | 5. Sync | Add a row to `pipelines/sync-engine/src/config/sync_jobs.yaml`: `bq_view`, `pg_table`, `primary_key`. That's the only place a new BQ→Postgres sync is registered — `bq_to_postgres.py` just reads this list, there's no separate allowlist to touch. |
@@ -29,12 +29,9 @@ When you want to pull in a new table from nba_api or elsewhere:
 **Gap today — no scheduled pipeline.** Root `Taskfile.yml` has no `ingest-daily` (or equivalent) composed task yet — only `lint`/`typecheck`/`test`/`coverage`/`integration-test`, and each service's own `ci` task (what `.github/workflows/ci.yml` actually runs). Until a composed ingest task exists, run each stage by hand:
 
 ```bash
-# 1. ingest → GCS
+# 1-2. ingest → GCS → BQ raw (ingest_*() uploads then loads in one call)
 task ingestion:build
-docker run --rm -v $PWD/pipelines/ingestion-engine:/app -w /app ingestion-engine-dev uv run python src/main.py
-
-# 2. GCS → BQ (manual, see step 2 above)
-bq load --source_format=PARQUET raw_nba_api.<table> gs://hoop-brain-raw-data/nba-api/<table>.parquet
+task ingestion:run-main
 
 # 3-4. staging → mart
 task transformation:build

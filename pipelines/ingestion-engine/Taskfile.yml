@@ -32,6 +32,11 @@ tasks:
     cmds:
       - "{{.DOCKER_RUN}} pytest --cov=ingestion_engine --cov-report=html:coverage.html tests"
 
+  run-main:
+    desc: Run the {{.SERVICE_NAME}} app (ingest -> GCS -> BQ raw)
+    cmds:
+      - "{{.DOCKER_RUN}} python src/main.py"
+
   ci:
     desc: Run CI checks for {{.SERVICE_NAME}}
     cmds:
