@@ -15,6 +15,7 @@ dependencies = [
     "polars>=1.31.0",
     "psutil>=7.0.0",
     "google-cloud-storage>=3.2.0",
+    "rich>=14.0.0",
 ]
 
 [tool.setuptools]
@@ -28,5 +29,4 @@ build-backend = "setuptools.build_meta"
 dev = [
     "coverage>=7.9.2",
     "pre-commit>=4.2.0",
-    "rich>=14.0.0",
 ]
