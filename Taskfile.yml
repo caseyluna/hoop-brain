@@ -65,6 +65,7 @@ tasks:
     desc: Run API integration test
     cmds:
       - task: api:migrate-test
+      - task: transformation:build
       - task: transformation:dbt-build
       - task: sync:run-main
       - task: api:integration-test
