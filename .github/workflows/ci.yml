@@ -8,8 +8,8 @@ on:
       - "api/**"
       - "web/**"
       - "pipelines/**"
-      - "infra/**"
       - "docker-compose.yaml"
+      - "Taskfile.yml"
       - ".github/**"
   pull_request:
     branches:
@@ -18,8 +18,8 @@ on:
       - "api/**"
       - "web/**"
       - "pipelines/**"
-      - "infra/**"
       - "docker-compose.yaml"
+      - "Taskfile.yml"
       - ".github/**"
 
 jobs:
@@ -63,53 +63,22 @@ jobs:
             target: dev
           EOF
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Task
+        uses: arduino/setup-task@v2
         with:
-          python-version: "3.11"
+          version: "3.x"
 
-      - name: Install CLI Python packages
-        run: pip install "dagger-io==0.19.10" anyio pyyaml python-dotenv
-
-      - name: Install Dagger CLI
+      - name: Build ${{ matrix.service }} image
         run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.19.10/dagger_v0.19.10_linux_amd64.tar.gz \
-            | tar -xz dagger
-          sudo mv dagger /usr/local/bin/
+          NAMESPACE="${{ matrix.service }}"
+          NAMESPACE="${NAMESPACE%-engine}"
+          task "${NAMESPACE}:build"
 
-      - name: uv sync if needed
+      - name: Run ${{ matrix.service }} CI checks
         run: |
-          SRCDIR="${{ matrix.service }}"
-          if [ -f "$SRCDIR/pyproject.toml" ] || [ -f "pipelines/$SRCDIR/pyproject.toml" ]; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-            export PATH="$HOME/.cargo/bin:$PATH"
-            if [ -d "pipelines/$SRCDIR" ]; then
-              cd pipelines/$SRCDIR
-            else
-              cd "$SRCDIR"
-            fi
-            uv sync
-          fi
-
-      - name: Run ${{ matrix.service }} pipeline
-        run: |
-          run_with_retry() {
-            local cmd="$1"
-            local max_attempts="${2:-3}"
-            local delay="${3:-20}"
-            local attempt=1
-            while [ "$attempt" -le "$max_attempts" ]; do
-              if eval "$cmd"; then
-                return 0
-              fi
-              echo "Attempt $attempt failed, retrying in ${delay}s..."
-              sleep "$delay"
-              attempt=$((attempt + 1))
-            done
-            return 1
-          }
-
-          run_with_retry "dagger run python infra/dagger/cli.py ${{ matrix.service }}-ci" 3 20
+          NAMESPACE="${{ matrix.service }}"
+          NAMESPACE="${NAMESPACE%-engine}"
+          task "${NAMESPACE}:ci"
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON || '{}' }}
 
@@ -128,11 +97,18 @@ jobs:
             exit 1
           fi
           mkdir -p keys
-          cat << 'EOF' > keys/service_account.json
-          ${GCP_SERVICE_ACCOUNT_JSON}
-          EOF
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > keys/service_account.json
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+
+      - name: Ensure .env.test
+        run: |
+          cat << 'EOF' > .env.test
+          POSTGRES_DB=hoopbrain_test
+          PGPASSWORD=postgres
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/hoopbrain_test
+          GOOGLE_APPLICATION_CREDENTIALS=/keys/service_account.json
+          EOF
 
       - name: Ensure DBT profiles
         run: |
@@ -152,27 +128,12 @@ jobs:
             target: dev
           EOF
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Install Task
+        uses: arduino/setup-task@v2
         with:
-          python-version: "3.11"
+          version: "3.x"
 
-      - name: Install CLI Python packages
-        run: pip install "dagger-io==0.19.10" anyio pyyaml python-dotenv
-
-      - name: Install Dagger CLI
-        run: |
-          curl -L https://github.com/dagger/dagger/releases/download/v0.19.10/dagger_v0.19.10_linux_amd64.tar.gz \
-            | tar -xz dagger
-          sudo mv dagger /usr/local/bin/
-
-      - name: Run Integration Test pipeline
-        run: |
-          for i in 1 2 3; do
-            if dagger run python infra/dagger/cli.py integration-test; then exit 0; fi
-            echo "Attempt $i failed, retrying in 20s..."
-            sleep 20
-          done
-          exit 1
+      - name: Run integration test
+        run: task integration-test
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}

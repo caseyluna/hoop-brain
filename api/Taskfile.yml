@@ -3,7 +3,7 @@ version: "3"
 vars:
   SERVICE_NAME: api
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  DOCKER_RUN: docker run --rm -v $PWD:/app -v /app/.venv -w /app {{.IMAGE_NAME}} uv run
   ENV_FILE: .env.test
 
 tasks:
@@ -14,15 +14,38 @@ tasks:
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} ruff format --check ."
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
+    cmds:
+      - "{{.DOCKER_RUN}} ruff check ."
+
+  migrate-test:
+    desc: Create the test DB and run Alembic migrations for {{.SERVICE_NAME}}
     dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff --check ."
+      - >-
+        docker compose run --rm api bash -c "./scripts/wait-for-db.sh db psql -h db -U postgres -c 'CREATE DATABASE hoopbrain_test' || true && ./scripts/wait-for-db.sh db uv run alembic upgrade head"
+
+  integration-test:
+    desc: Run integration tests for {{.SERVICE_NAME}}
+    dir: ..
+    cmds:
+      - docker compose run --rm api uv run pytest tests
+
+  run-main:
+    desc: Run the {{.SERVICE_NAME}} app
+    dir: ..
+    cmds:
+      - docker compose up api
+
+  ci:
+    desc: Run CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: lint
+      - task: typecheck
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}

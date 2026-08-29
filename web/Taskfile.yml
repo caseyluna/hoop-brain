@@ -3,30 +3,40 @@ version: "3"
 vars:
   SERVICE_NAME: web
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  DOCKER_RUN: docker run --rm -v $PWD:/app -v /app/node_modules -w /app {{.IMAGE_NAME}}
   ENV_FILE: .env.test
 
 tasks:
   build:
-    desc: build local docker image for api (if needed)
+    desc: build local docker image for web (if needed)
     cmds:
-      - docker_buildkit=1 docker build -t {{.IMAGE_NAME}} .
+      - docker_buildkit=1 docker build -f Dockerfile.dev -t {{.IMAGE_NAME}} .
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff format --check ."
+      - "{{.DOCKER_RUN}} npm run lint"
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff --check ."
+      - "{{.DOCKER_RUN}} npm run typecheck"
+
+  test:
+    desc: Run tests for {{.SERVICE_NAME}}
+    cmds:
+      - "{{.DOCKER_RUN}} npm run test -- --run"
+
+  ci:
+    desc: Run CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
 
   all-checks:
-    desc: Run all CI checks for {{.SERVICE_NAME}}
-    dir: ..
+    desc: Run all checks for {{.SERVICE_NAME}}
     cmds:
-      - task lint
-      - task typecheck
+      - task: lint
+      - task: typecheck
+      - task: test

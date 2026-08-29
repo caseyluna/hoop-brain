@@ -4,7 +4,7 @@ vars:
   SERVICE_NAME: transformation-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
   DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} dbt
-  PROFILES_DIR: --profiles-dr /app/profiles
+  PROFILES_DIR: --profiles-dir /app/profiles
   ENV_FILE: .env.test
 
 tasks:
@@ -15,27 +15,30 @@ tasks:
 
   dbt-parse:
     desc: Run dbt-parse for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} parse {{.PROFILES_DIR}}"
 
   dbt-deps:
     desc: Run dbt-deps for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} deps {{.PROFILES_DIR}}"
 
   dbt-test:
     desc: Run dbt-test for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} test {{.PROFILES_DIR}}"
 
   dbt-build:
     desc: Run dbt-build for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} build {{.PROFILES_DIR}}"
+
+  ci:
+    desc: Run CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: dbt-parse
+      - task: dbt-deps
+      - task: dbt-test
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}

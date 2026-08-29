@@ -3,7 +3,7 @@ version: "3"
 vars:
   SERVICE_NAME: model-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
-  DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} uv run
+  DOCKER_RUN: docker run --rm -v $PWD:/app -v /app/.venv -w /app {{.IMAGE_NAME}} uv run
   ENV_FILE: .env.test
 
 tasks:
@@ -14,27 +14,31 @@ tasks:
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} ruff format --check ."
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
-      - "{{.DOCKER_RUN}} ruff --check ."
+      - "{{.DOCKER_RUN}} ruff check ."
 
   test:
     desc: Run tests for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} pytest tests"
 
   coverage:
     desc: Run coverage for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} pytest --cov=ingestion_engine --cov-report=html:coverage.html tests"
+
+  ci:
+    desc: Run CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: lint
+      - task: typecheck
+      - task: test
+      - task: coverage
 
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}

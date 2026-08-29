@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "Ingestion engine service"
 requires-python = ">=3.10"
 dependencies = [
-    "dagger-io>=0.18.14",
     "nba-api>=1.10.0",
     "pandas>=2.3.1",
     "pre-commit>=4.2.0",
@@ -16,6 +15,7 @@ dependencies = [
     "polars>=1.31.0",
     "psutil>=7.0.0",
     "google-cloud-storage>=3.2.0",
+    "rich>=14.0.0",
 ]
 
 [tool.setuptools]
@@ -29,5 +29,4 @@ build-backend = "setuptools.build_meta"
 dev = [
     "coverage>=7.9.2",
     "pre-commit>=4.2.0",
-    "rich>=14.0.0",
 ]

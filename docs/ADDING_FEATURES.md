@@ -26,7 +26,7 @@ When you want to pull in a new table from nba_api or elsewhere:
 | 4. Mart | Create `models/marts/<table>.sql` (or merge into an existing mart). |
 | 5. Sync | Add a row to `pipelines/sync-engine/src/config/sync_jobs.yaml`: `bq_view`, `pg_table`, `primary_key`. That's the only place a new BQ→Postgres sync is registered — `bq_to_postgres.py` just reads this list, there's no separate allowlist to touch. |
 
-**Gap today — no scheduled pipeline.** `pipelines.yaml` has no `ingest-daily` (or equivalent) composed pipeline yet — only `lint-all`/`typecheck-all`/`test-all`/`coverage-all`/`integration-test` and per-service `*-ci` blocks. Until that exists, run each stage by hand:
+**Gap today — no scheduled pipeline.** Root `Taskfile.yml` has no `ingest-daily` (or equivalent) composed task yet — only `lint`/`typecheck`/`test`/`coverage`/`integration-test`, and each service's own `ci` task (what `.github/workflows/ci.yml` actually runs). Until a composed ingest task exists, run each stage by hand:
 
 ```bash
 # 1. ingest → GCS
@@ -61,20 +61,20 @@ For things like RAPM, BPM, traits, surplus value — anything that reads from ma
 | 2. Module | Write the model in `pipelines/model-engine/<name>/src/main.py` (or split into modules under `src/`). Read from BQ marts or Postgres; write to a derived table, e.g. `player_season_<metric>`. |
 | 3. Shared code | No shared helper library exists yet. Duplicate the small amount of BQ/Postgres I/O boilerplate per model rather than building an abstraction — revisit only once 3+ models make the duplication genuinely painful, per this repo's own convention against premature abstraction. If the future orchestrator app ends up owning this I/O layer, that supersedes duplicating it per model. |
 | 4. Tests | Unit tests on synthetic fixtures under `pipelines/model-engine/<name>/tests/` — boundary behavior (trait thresholds, cap rule edges, etc.) is the whole point. |
-| 5. Wire the run path | Add a `run-main` job to the new service's block in `services.yaml`, e.g. `["uv", "run", "python", "src/main.py"]` (mirrors `ingestion-engine`'s `run-main`). Without this there's no way to actually execute the model via the Taskfile/Dagger path. |
-| 6. CI pipeline | Add a `model-<name>-ci` block to `pipelines.yaml`, mirroring the existing `ingestion-engine-ci` block (`[lint, typecheck, test, coverage]`). |
+| 5. Wire the run path | Add a `run-main` task to the new service's `Taskfile.yml`, e.g. `docker compose run --rm <service> uv run python src/main.py` (mirrors `sync-engine`'s `run-main`). Without this there's no way to actually execute the model via Task. |
+| 6. CI checks | Add a `ci` task to the new service's `Taskfile.yml` (`task: lint`, `task: typecheck`, `task: test`, `task: coverage`), mirroring `ingestion-engine`'s `ci` task. `.github/workflows/ci.yml`'s matrix calls `task <namespace>:ci` directly — without this task, CI has nothing to run for the new service. |
 | 7. Root Taskfile | Add a new entry under `includes:` in the root `Taskfile.yml` pointing at the nested path (e.g. `model-<name>: {taskfile: ./pipelines/model-engine/<name>/Taskfile.yml, dir: ./pipelines/model-engine/<name>}`) — without this, `task model-<name>:build` won't resolve; Task only knows about namespaces explicitly listed there. |
 | 8. Sync | If the API needs the output in Postgres, add it to `sync_jobs.yaml` (§1 step 5). |
 | 9. API | Expose via a new/updated endpoint if the frontend needs it (§4). |
 
-**Gap today — no template subdir, no orchestrator, no scheduled pipeline.** `pipelines/model-engine/` today is still a flat stub (`Dockerfile`/`Taskfile.yml`/`pyproject.toml`/`src/main.py` directly at that level, no subdirectories) — it hasn't been restructured into the nested shape above yet. Do that restructuring — move the stub's contents into a `pipelines/model-engine/_template/` subdir and update `services.yaml`/root `Taskfile.yml` to match — as part of building the *first* real model, rather than as a no-op refactor now. Until then, run a model manually the same way as the other pipelines:
+**Gap today — no template subdir, no orchestrator, no scheduled pipeline.** `pipelines/model-engine/` today is still a flat stub (`Dockerfile`/`Taskfile.yml`/`pyproject.toml`/`src/main.py` directly at that level, no subdirectories) — it hasn't been restructured into the nested shape above yet. Do that restructuring — move the stub's contents into a `pipelines/model-engine/_template/` subdir and update the root `Taskfile.yml` to match — as part of building the *first* real model, rather than as a no-op refactor now. Until then, run a model manually the same way as the other pipelines:
 
 ```bash
 task model-<name>:build
 docker run --rm -v $PWD/pipelines/model-engine/<name>:/app -w /app model-<name>-dev uv run python src/main.py
 ```
 
-**Config keys:** `services.yaml`, `pipelines.yaml`, `sync_jobs.yaml`. Avoid hardcoding table names in the model.
+**Config keys:** the new service's `Taskfile.yml`, root `Taskfile.yml`, `sync_jobs.yaml`. Avoid hardcoding table names in the model.
 
 ---
 
@@ -131,6 +131,5 @@ Once React Router and TanStack Query are installed (F0), this section should be 
 | Config | Purpose |
 |--------|---------|
 | `sync_jobs.yaml` | BQ view → Postgres table mapping. Add new rows for new entities. |
-| `services.yaml` | Service definitions and jobs (lint, typecheck, test, coverage, run-main). Every new `pipelines/model-engine/<name>/` needs its own block here, including `run-main`. |
-| `pipelines.yaml` | Composed pipelines used by CI/Dagger — `lint-all`, `typecheck-all`, `test-all`, `coverage-all`, `integration-test`, and per-service `*-ci` blocks. No scheduled/batch pipeline (e.g. `ingest-daily`) exists yet — that's a future ticket, not something to assume is running. |
-| Root `Taskfile.yml` (`includes:`) | Maps `task <name>:...` to a service directory. Every new `pipelines/model-engine/<name>/` needs its own entry here or `task model-<name>:build` won't resolve. |
+| `<service>/Taskfile.yml` | Per-service task definitions (lint, typecheck, test, coverage, `ci`, `run-main`). Every new `pipelines/model-engine/<name>/` needs its own Taskfile with at least `build`, `lint`, `typecheck`, `ci`. |
+| Root `Taskfile.yml` (`includes:` + composed tasks) | Maps `task <name>:...` to a service directory, and composes cross-service tasks (`lint`, `test`, `integration-test`, and eventually `ingest-daily`). Every new `pipelines/model-engine/<name>/` needs its own `includes:` entry here or `task model-<name>:build` won't resolve. |
