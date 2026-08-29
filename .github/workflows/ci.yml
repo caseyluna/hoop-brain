@@ -103,6 +103,15 @@ jobs:
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
+      - name: Ensure .env.test
+        run: |
+          cat << 'EOF' > .env.test
+          POSTGRES_DB=hoopbrain_test
+          PGPASSWORD=postgres
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/hoopbrain_test
+          GOOGLE_APPLICATION_CREDENTIALS=/keys/service_account.json
+          EOF
+
       - name: Ensure DBT profiles
         run: |
           mkdir -p pipelines/transformation-engine/profiles

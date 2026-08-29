@@ -67,7 +67,7 @@ For things like RAPM, BPM, traits, surplus value — anything that reads from ma
 | 8. Sync | If the API needs the output in Postgres, add it to `sync_jobs.yaml` (§1 step 5). |
 | 9. API | Expose via a new/updated endpoint if the frontend needs it (§4). |
 
-**Gap today — no template subdir, no orchestrator, no scheduled pipeline.** `pipelines/model-engine/` today is still a flat stub (`Dockerfile`/`Taskfile.yml`/`pyproject.toml`/`src/main.py` directly at that level, no subdirectories) — it hasn't been restructured into the nested shape above yet. Do that restructuring — move the stub's contents into a `pipelines/model-engine/_template/` subdir and update `services.yaml`/root `Taskfile.yml` to match — as part of building the *first* real model, rather than as a no-op refactor now. Until then, run a model manually the same way as the other pipelines:
+**Gap today — no template subdir, no orchestrator, no scheduled pipeline.** `pipelines/model-engine/` today is still a flat stub (`Dockerfile`/`Taskfile.yml`/`pyproject.toml`/`src/main.py` directly at that level, no subdirectories) — it hasn't been restructured into the nested shape above yet. Do that restructuring — move the stub's contents into a `pipelines/model-engine/_template/` subdir and update the root `Taskfile.yml` to match — as part of building the *first* real model, rather than as a no-op refactor now. Until then, run a model manually the same way as the other pipelines:
 
 ```bash
 task model-<name>:build
