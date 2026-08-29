@@ -69,3 +69,13 @@ tasks:
       - task: transformation:dbt-build
       - task: sync:run-main
       - task: api:integration-test
+
+  ingest-daily:
+    desc: Run the full ingest pipeline end to end (ingest -> GCS -> BQ raw -> dbt staging/mart -> Postgres sync)
+    cmds:
+      - task: ingestion:build
+      - task: ingestion:run-main
+      - task: transformation:build
+      - task: transformation:dbt-build
+      - task: sync:build
+      - task: sync:run-main

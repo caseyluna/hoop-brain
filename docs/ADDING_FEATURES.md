@@ -26,21 +26,13 @@ When you want to pull in a new table from nba_api or elsewhere:
 | 4. Mart | Create `models/marts/<table>.sql` (or merge into an existing mart). |
 | 5. Sync | Add a row to `pipelines/sync-engine/src/config/sync_jobs.yaml`: `bq_view`, `pg_table`, `primary_key`. That's the only place a new BQ→Postgres sync is registered — `bq_to_postgres.py` just reads this list, there's no separate allowlist to touch. |
 
-**Gap today — no scheduled pipeline.** Root `Taskfile.yml` has no `ingest-daily` (or equivalent) composed task yet — only `lint`/`typecheck`/`test`/`coverage`/`integration-test`, and each service's own `ci` task (what `.github/workflows/ci.yml` actually runs). Until a composed ingest task exists, run each stage by hand:
+Root `Taskfile.yml` composes all of this into one task — `task ingest-daily` runs ingest → GCS → BQ raw → dbt staging/mart → Postgres sync in order, no manual intermediate steps:
 
 ```bash
-# 1-2. ingest → GCS → BQ raw (ingest_*() uploads then loads in one call)
-task ingestion:build
-task ingestion:run-main
-
-# 3-4. staging → mart
-task transformation:build
-docker run --rm -v $PWD/pipelines/transformation-engine:/app -w /app transformation-engine-dev dbt build --profiles-dir profiles
-
-# 5. sync → Postgres
-task sync:build
-docker run --rm -v $PWD/pipelines/sync-engine:/app -w /app sync-engine-dev uv run python src/main.py
+task ingest-daily
 ```
+
+**Gap today — no GitHub Actions schedule.** CLAUDE.md's "scheduled ingestion via GitHub Actions" is the target architecture, but no workflow in `.github/workflows/` triggers `task ingest-daily` on a cron yet — it only runs when invoked by hand.
 
 **Files to touch:** ingestion-engine module, `sources.yml`, dbt staging + mart models, `sync_jobs.yaml`.
 
