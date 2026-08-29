@@ -1,12 +1,12 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Enum, Integer, String
 
 from app.db.base import Base
+from app.models.enums import League
 
 
 class Team(Base):
     __tablename__ = "teams"
 
-    league = Column(String, nullable=False, server_default="NBA")
     id = Column(Integer, primary_key=True, index=True)
     full_name = Column(String, nullable=False)
     abbreviation = Column(String, nullable=False)
@@ -14,3 +14,8 @@ class Team(Base):
     city = Column(String, nullable=False)
     state = Column(String, nullable=False)
     year_founded = Column(Integer, nullable=False)
+    league = Column(
+        Enum(League, name="league"),
+        nullable=False,
+        server_default=League.NBA.value,
+    )

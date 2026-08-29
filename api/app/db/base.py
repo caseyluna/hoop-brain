@@ -6,4 +6,4 @@ Base = declarative_base()
 # not imported here is invisible to that diff, so autogenerate reads it as
 # "should not exist" and will script a DROP for its table. Import every
 # model module below, even if nothing in this file appears to use it.
-from app.models.team import Team  # noqa: E402, F401
+from app.models import team  # noqa: E402, F401
