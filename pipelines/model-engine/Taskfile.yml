@@ -14,25 +14,21 @@ tasks:
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} ruff format --check ."
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} ruff check ."
 
   test:
     desc: Run tests for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} pytest tests"
 
   coverage:
     desc: Run coverage for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} pytest --cov=ingestion_engine --cov-report=html:coverage.html tests"
 

@@ -15,25 +15,21 @@ tasks:
 
   dbt-parse:
     desc: Run dbt-parse for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} parse {{.PROFILES_DIR}}"
 
   dbt-deps:
     desc: Run dbt-deps for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} deps {{.PROFILES_DIR}}"
 
   dbt-test:
     desc: Run dbt-test for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} test {{.PROFILES_DIR}}"
 
   dbt-build:
     desc: Run dbt-build for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} build {{.PROFILES_DIR}}"
 

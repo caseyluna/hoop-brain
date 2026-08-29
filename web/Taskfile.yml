@@ -14,19 +14,16 @@ tasks:
 
   lint:
     desc: Run lint check for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} npm run lint"
 
   typecheck:
     desc: Run typecheck for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} npm run typecheck"
 
   test:
     desc: Run tests for {{.SERVICE_NAME}}
-    dir: ..
     cmds:
       - "{{.DOCKER_RUN}} npm run test -- --run"
 
