@@ -4,7 +4,7 @@ vars:
   SERVICE_NAME: transformation-engine
   IMAGE_NAME: "{{.SERVICE_NAME}}-dev"
   DOCKER_RUN: docker run --rm -v $PWD:/app -w /app {{.IMAGE_NAME}} dbt
-  PROFILES_DIR: --profiles-dr /app/profiles
+  PROFILES_DIR: --profiles-dir /app/profiles
   ENV_FILE: .env.test
 
 tasks:
