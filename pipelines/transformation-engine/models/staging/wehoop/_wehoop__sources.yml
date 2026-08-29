@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: wehoop
+    schema: raw_wehoop
+    tables:
+      - name: teams
+        description: Raw WNBA team records, loaded from GCS Parquet via ingestion-engine's WNBAApi.

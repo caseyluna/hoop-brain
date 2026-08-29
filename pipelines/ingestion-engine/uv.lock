@@ -658,6 +658,7 @@ dependencies = [
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "requests" },
     { name = "rich" },
     { name = "ruff" },
 ]
@@ -681,6 +682,7 @@ requires-dist = [
     { name = "pyright", specifier = ">=1.1.403" },
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "pytest-cov", specifier = ">=6.2.1" },
+    { name = "requests", specifier = ">=2.34.2" },
     { name = "rich", specifier = ">=14.0.0" },
     { name = "ruff", specifier = ">=0.12.4" },
 ]
