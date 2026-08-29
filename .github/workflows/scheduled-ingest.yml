@@ -1,0 +1,88 @@
+name: Scheduled Ingestion
+
+on:
+  schedule:
+    # 08:00 UTC daily = ~3-4am US Eastern, off-peak
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: scheduled-ingest
+  cancel-in-progress: false
+
+jobs:
+  scheduled-ingest:
+    name: ingest -> BQ -> dbt -> sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare real GCP credentials
+        run: |
+          if [ -z "${GCP_SERVICE_ACCOUNT_JSON}" ]; then
+            echo "::error::GCP_SERVICE_ACCOUNT_JSON must be set"
+            exit 1
+          fi
+          mkdir -p keys pipelines/transformation-engine/keys pipelines/ingestion-engine/keys
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > keys/service_account.json
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > pipelines/transformation-engine/keys/service_account.json
+          printf '%s' "$GCP_SERVICE_ACCOUNT_JSON" > pipelines/ingestion-engine/keys/service_account.json
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+
+      - name: Ensure .env.test
+        run: |
+          cat << 'EOF' > .env.test
+          POSTGRES_DB=hoopbrain_test
+          PGPASSWORD=postgres
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/hoopbrain_test
+          GOOGLE_APPLICATION_CREDENTIALS=/keys/service_account.json
+          EOF
+
+      - name: Ensure DBT profiles
+        run: |
+          mkdir -p pipelines/transformation-engine/profiles
+          cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
+          transformation_engine:
+            outputs:
+              dev:
+                type: postgres
+                threads: 1
+                host: db
+                port: 5432
+                user: postgres
+                pass: postgres
+                dbname: hoopbrain_test
+                schema: public
+            target: dev
+          EOF
+
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: "3.x"
+
+      - name: Build service images
+        run: |
+          task ingestion:build
+          task api:build
+          task sync:build
+          task transformation:build
+
+      - name: Ingest -> GCS -> BigQuery raw
+        run: task ingestion:run-main
+
+      - name: Apply Postgres migrations
+        run: task api:migrate-test
+
+      - name: Transform (dbt)
+        run: task transformation:dbt-build
+
+      - name: Sync BigQuery -> Postgres
+        run: task sync:run-main
+
+      - name: Tear down local services
+        if: always()
+        run: docker compose down -v
