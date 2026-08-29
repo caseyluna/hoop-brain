@@ -64,6 +64,8 @@ NBA and WNBA share infrastructure but are separate leagues: separate CBAs, cap s
 
 ## Entity resolution (identity is sacred)
 
+Full decision record: `docs/adr/001-player-identity.md`.
+
 Sources use non-matching player IDs (nba_api numeric IDs, WNBA vendor IDs, name-only contract scrapes). Internal surrogate `player_id` keys everything; `PlayerSourceMapping` (`internal_player_id, league, source, source_id, match_method, confidence, matched_at`) is the only table holding raw source IDs. Matching tiers: (1) authoritative passthrough (nba_api for NBA = confidence 1.0), (2) deterministic name+birthdate+league, (3) fuzzy with confidence score, (4) **below threshold → review queue, never auto-resolve.** NBA and WNBA players are never cross-matched. Ingestion re-runs must be idempotent — zero duplicate players.
 
 ## Key model decisions (see PRDs for full detail)
