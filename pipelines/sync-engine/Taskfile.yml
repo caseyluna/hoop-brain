@@ -36,7 +36,7 @@ tasks:
     desc: Run the {{.SERVICE_NAME}} app
     dir: ..
     cmds:
-      - docker compose run --rm sync-engine uv run python src/main.py
+      - docker compose run --rm --entrypoint "" sync-engine uv run python src/main.py
 
   ci:
     desc: Run CI checks for {{.SERVICE_NAME}}
