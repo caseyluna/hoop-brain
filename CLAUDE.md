@@ -28,7 +28,7 @@ ingestion-engine (Python) → Parquet in GCS → BigQuery raw_<vendor>
   → web (React + TS + Vite + Tailwind, built via Claude Design)
 ```
 
-Docker Compose locally; Dagger orchestration + CI (`services.yaml`, `pipelines.yaml`); scheduled ingestion via GitHub Actions. Extension pattern is documented in `docs/ADDING_FEATURES.md` — follow it for every new source, model, endpoint, and page. `model-engine` in the diagram above is not one shared service: each analytical model (RAPM, traits, surplus value, ...) is its own self-contained container living as a subdirectory of `pipelines/model-engine/` (`pipelines/model-engine/<name>/`), never a module bolted onto one monolithic model-engine. A `model-engine` orchestrator app to facilitate deploying/running each model subdirectory is planned but not yet built.
+Docker Compose locally; Task (`Taskfile.yml`, one per service + a composing root file) drives both local dev checks and CI; scheduled ingestion via GitHub Actions. Extension pattern is documented in `docs/ADDING_FEATURES.md` — follow it for every new source, model, endpoint, and page. `model-engine` in the diagram above is not one shared service: each analytical model (RAPM, traits, surplus value, ...) is its own self-contained container living as a subdirectory of `pipelines/model-engine/` (`pipelines/model-engine/<name>/`), never a module bolted onto one monolithic model-engine. A `model-engine` orchestrator app to facilitate deploying/running each model subdirectory is planned but not yet built.
 
 **Division of computation (a rule):** heavy compute (aggregation, model fitting, percentiles) happens batch in BigQuery/dbt/model-engine; Postgres holds pre-computed read-optimized results; the API does only cheap request-time work. Exceptions (user-chosen inputs, so request-time by necessity): trade validation and Team Fit — both read pre-computed inputs and apply rules logic. Doubly important on Vercel serverless. Use pooled Postgres connections always.
 
@@ -36,27 +36,27 @@ Docker Compose locally; Dagger orchestration + CI (`services.yaml`, `pipelines.y
 
 Local dev: `docker compose up --build` runs `db` (Postgres), `api` (:8000), `web` (:5173, Vite), and a shell-only `sync-engine` container. Data persists in the `postgres_data` volume — no reseed needed between runs. Shell into a running service: `docker compose exec <service> /bin/bash`. New table → write the model, then run Alembic inside the `api` container (`alembic revision --autogenerate` / `alembic upgrade head`).
 
-Root `Taskfile.yml` drives CI-equivalent checks across all services via Dagger (`infra/dagger/cli.py`, config'd by `services.yaml` + `pipelines.yaml`):
+Root `Taskfile.yml` `includes:` every service's Taskfile and composes cross-service checks natively (no separate orchestrator):
 - `task lint` / `task typecheck` / `task test` / `task coverage` — run that check for every service
-- `task integration-test` — api DB migration against a test DB, boots sync-engine, runs api integration tests
+- `task integration-test` — api DB migration against a test DB (via `docker compose run`), boots sync-engine, runs api integration tests
 
-Per-service Taskfiles (`api/`, `web/`, `pipelines/{ingestion,model,sync,transformation}-engine/`) run the same checks locally via `task build` (builds a `<service>-dev` image) then `task lint` / `task typecheck` / `task all-checks`; Python services also have `task test` / `task coverage` (pytest under the hood).
+Per-service Taskfiles (`api/`, `web/`, `pipelines/{ingestion,model,sync,transformation}-engine/`) run the same checks locally via `task build` (builds a `<service>-dev` image) then `task lint` / `task typecheck` / `task <ns>:ci` (the exact composition CI runs) / `task all-checks`; Python services also have `task test` / `task coverage` (pytest under the hood). CI (`.github/workflows/ci.yml`) calls `task <ns>:build` then `task <ns>:ci` per service via a matrix, plus root `task integration-test` — same commands as local dev, just run by GitHub Actions instead of by hand.
 
 To run a single Python test, bypass the Taskfile and call pytest directly, e.g. from `api/`: `uv run pytest tests/test_teams.py::test_list_teams` (or via the dev image: `docker run --rm -v $PWD:/app -w /app api-dev uv run pytest tests/test_teams.py::test_list_teams`).
 
-web (`web/`, plain npm, no Docker wrapper needed): `npm run dev`, `npm run build`, `npm run test` (vitest), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit). Single test: `npm run test -- TeamsTable.test.tsx`.
+web (`web/`, plain npm, no Docker wrapper needed for local dev — CI runs it through the `web-dev` image via the Taskfile): `npm run dev`, `npm run build`, `npm run test` (vitest), `npm run lint` (eslint), `npm run typecheck` (tsc --noEmit). Single test: `npm run test -- TeamsTable.test.tsx`.
 
-transformation-engine (dbt): jobs are `dbt-parse`, `dbt-deps`, `dbt-test`, `dbt-build`, all run with `--profiles-dir profiles` (see `services.yaml`).
+transformation-engine (dbt): tasks are `dbt-parse`, `dbt-deps`, `dbt-test`, `dbt-build`, all run with `--profiles-dir profiles`.
 
-`services.yaml` is the source of truth for what a job actually runs per service — check it before assuming a task/command exists.
+Each service's own `Taskfile.yml` is the source of truth for what a task actually runs — check it before assuming a command exists.
 
 ## Repository map
 
 - `api/app/` — FastAPI app. `api/routes/<resource>.py` (routers) → mounted in `api/api_v1/api.py` under `/api/v1`; `models/` (SQLAlchemy) + `schemas/` (Pydantic); `db/base.py` imports all models for Alembic autogenerate, `db/session.py` is the pooled engine/session. `alembic/` migrations run inside the api container, not on host. Today only `/health` and `/api/v1/teams` exist.
 - `web/src/` — `components/` holds pages + UI (colocated `*.test.tsx`, vitest + RTL). Vite dev server proxies `/api/v1/...` to the api container (`API_PROXY_TARGET` in `docker-compose.yaml`) — always fetch with relative paths.
 - `pipelines/<engine>/` — `ingestion-engine`, `model-engine`, `sync-engine` are independent uv-managed Python packages (own Dockerfile, `pyproject.toml`, `tests/`); `src/main.py` is the entrypoint each one's `run-main` job invokes. `sync-engine/src/config/sync_jobs.yaml` declaratively maps `bq_view → pg_table` (+ `primary_key`) — the only place new BQ→Postgres syncs get registered. `transformation-engine/` is the dbt project (`models/staging`, `macros`, `seeds`, `snapshots`, `profiles/profiles.yml`).
-- `infra/dagger/` — Dagger Python orchestration (`cli.py` entrypoint, `config.py` loads `services.yaml`/`pipelines.yaml`, `orchestrator.py`/`service.py` build per-service containers and run jobs). This is what every `task lint/typecheck/test/coverage/integration-test` at the repo root actually calls, and what GitHub Actions calls in CI.
-- Root config = the extension surface (see `docs/ADDING_FEATURES.md`): `services.yaml` (per-service job definitions), `pipelines.yaml` (composed pipelines used by CI/Dagger, e.g. `lint-all`, `<service>-ci`), `pipelines/sync-engine/src/config/sync_jobs.yaml` (sync registrations).
+- Root `Taskfile.yml` composes every service's Taskfile (`includes:`) into the cross-service `lint`/`typecheck`/`test`/`coverage`/`integration-test` tasks that both local dev and `.github/workflows/ci.yml` run — no separate orchestrator layer.
+- Root config = the extension surface (see `docs/ADDING_FEATURES.md`): each service's `Taskfile.yml` (job definitions, incl. the `ci` task CI actually calls), `pipelines/sync-engine/src/config/sync_jobs.yaml` (sync registrations).
 
 ## Two leagues, never conflated
 
@@ -86,7 +86,7 @@ All under `/api/v1`. Every response carries `league`. Model-derived fields carry
 
 ## Working conventions
 
-- **Testing:** every ingestion source gets a schema test; every dbt staging model gets uniqueness/not-null tests on its dedupe key; every model-engine module gets unit tests on synthetic fixtures (boundary behavior on trait thresholds and cap rules is the whole point); API keeps its integration-test pattern. Run per-service via existing Taskfiles/Dagger.
+- **Testing:** every ingestion source gets a schema test; every dbt staging model gets uniqueness/not-null tests on its dedupe key; every model-engine module gets unit tests on synthetic fixtures (boundary behavior on trait thresholds and cap rules is the whole point); API keeps its integration-test pattern. Run per-service via existing Taskfiles.
 - **Tickets:** work from Linear. Small, single-session issues (≤ S); anything larger is broken into sub-issues. Each ticket carries big-picture context, technical context, steps, DoD, and a test — read it fully before starting; if it conflicts with this file's Current state, flag the conflict, don't silently pick one.
 - **Scope discipline:** if a ticket's scope creeps mid-implementation, stop and flag — small chippable pieces are a deliberate choice. Don't gold-plate; don't build ahead of the current stage.
 - **This is a learning project as much as a shipping one:** when work involves a real design decision (modeling choice, schema tradeoff, statistical method), briefly explain the decision and why — don't just implement silently. Prefer approaches Casey can understand end-to-end over clever opacity.

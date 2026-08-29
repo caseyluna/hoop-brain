@@ -37,6 +37,13 @@ tasks:
     cmds:
       - "{{.DOCKER_RUN}} build {{.PROFILES_DIR}}"
 
+  ci:
+    desc: Run CI checks for {{.SERVICE_NAME}}
+    cmds:
+      - task: dbt-parse
+      - task: dbt-deps
+      - task: dbt-test
+
   all-checks:
     desc: Run all CI checks for {{.SERVICE_NAME}}
     dir: ..

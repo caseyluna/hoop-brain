@@ -1,10 +1,5 @@
 version: "3"
 
-vars:
-  DAGGER_SCRIPT: "infra/dagger/cli.py"
-  DAGGER_RUN: "dagger run python {{.DAGGER_SCRIPT}}"
-  ENV_FILE: .env.test
-
 includes:
   ingestion:
     taskfile: ./pipelines/ingestion-engine/Taskfile.yml
@@ -31,24 +26,44 @@ includes:
     dir: ./web
 
 tasks:
-  # Dagger based pipelines for CI and cross service orchestration
   lint:
-    desc: Run lint for all servies with Dagger
+    desc: Run lint for all services
     cmds:
-      - "{{.DAGGER_RUN}} lint-all"
+      - task: api:lint
+      - task: sync:lint
+      - task: ingestion:lint
+      - task: model:lint
+      - task: transformation:dbt-parse
+      - task: web:lint
+
   typecheck:
-    desc: Run typecheck for all servies with Dagger
+    desc: Run typecheck for all services
     cmds:
-      - "{{.DAGGER_RUN}} typecheck-all"
+      - task: api:typecheck
+      - task: sync:typecheck
+      - task: ingestion:typecheck
+      - task: model:typecheck
+      - task: web:typecheck
+
   test:
-    desc: Run tests for all servies with Dagger
+    desc: Run tests for all services
     cmds:
-      - "{{.DAGGER_RUN}} test-all"
+      - task: sync:test
+      - task: ingestion:test
+      - task: model:test
+      - task: web:test
+      - task: transformation:dbt-test
+
   coverage:
-    desc: Run coverage for all servies with Dagger
+    desc: Run coverage for all services
     cmds:
-      - "{{.DAGGER_RUN}} coverage-all"
+      - task: sync:coverage
+      - task: ingestion:coverage
+      - task: model:coverage
+
   integration-test:
-    desc: Run API integration test with Dagger
+    desc: Run API integration test
     cmds:
-      - "{{.DAGGER_RUN}} integration-test"
+      - task: api:migrate-test
+      - task: sync:run-main
+      - task: api:integration-test
