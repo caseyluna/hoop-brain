@@ -3,3 +3,4 @@ keys/service_account.json
 dbt_modules/
 target/
 profiles/
+logs/

@@ -1,0 +1,15 @@
+version: 2
+
+models:
+  - name: stg_nba_api__teams
+    description: Deduped NBA team records staged from raw_nba_api.teams.
+    columns:
+      - name: id
+        description: nba_api team ID (primary key).
+        tests:
+          - unique
+          - not_null
+      - name: league
+        description: League the team belongs to. Always 'NBA' for this source.
+        tests:
+          - not_null

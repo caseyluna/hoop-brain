@@ -95,9 +95,13 @@ class NBAApi:
     @PerfTracker.decorator("Ingest NBA Teams")
     def ingest_teams(self) -> None:
         """
-        Ingests NBA teams data, uploads it to GCS, and loads it into BigQuery.
+        Ingests NBA teams data, tags it with league, uploads it to GCS, and loads
+        it into BigQuery.
         """
         teams_data = self.get_teams()
         log(logger, "SUCCESS", "Retrieved NBA teams successfully", name="NBAApi")
+        # nba_api is NBA-only by definition; the WNBA adapter tags its own records.
+        for team in teams_data:
+            team["league"] = "NBA"
         self.upload(data=teams_data, filename="teams")
         self.load_to_bq(filename="teams")
