@@ -15,6 +15,7 @@ dependencies = [
     "polars>=1.31.0",
     "psutil>=7.0.0",
     "google-cloud-storage>=3.2.0",
+    "google-cloud-bigquery>=3.30.0",
     "rich>=14.0.0",
 ]
 

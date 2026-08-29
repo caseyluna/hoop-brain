@@ -2,6 +2,7 @@ from typing import Dict, List
 
 from nba_api.stats.static import players, teams
 
+from core.bigquery_utils import load_parquet_from_gcs
 from core.logging_utils import get_logger, log
 from core.performance_utils import PerfTracker
 from core.storage_utils import (
@@ -15,12 +16,16 @@ logger = get_logger(__name__)
 
 class NBAApi:
     """
-    A client for interacting with the NBA API to fetch raw data and uploading it to GCS as optimzied Parquet files.
+    A client for interacting with the NBA API to fetch raw data, uploading it to GCS
+    as optimized Parquet files, and loading it into BigQuery raw_<vendor> tables.
     """
 
-    def __init__(self, bucket: str, base_path: str = "nba-api"):
+    def __init__(
+        self, bucket: str, base_path: str = "nba-api", vendor: str = "nba_api"
+    ):
         self.bucket = bucket
         self.base_path = base_path
+        self.vendor = vendor
 
     @staticmethod
     @PerfTracker.decorator("Fetch NBA Teams")
@@ -68,11 +73,31 @@ class NBAApi:
             name="NBAApi",
         )
 
+    @PerfTracker.decorator("Load Data to BigQuery")
+    def load_to_bq(self, filename: str) -> None:
+        """
+        Loads a previously-uploaded Parquet file from GCS into this vendor's raw
+        BigQuery dataset (raw_<vendor>.<filename>).
+        Args:
+            filename (str): Base filename (without extension) previously uploaded via `upload()`.
+        """
+        log(logger, "INFO", f"Loading '{filename}' into BigQuery", name="NBAApi")
+        gcs_uri = f"gs://{self.bucket}/{self.base_path}/{filename}.parquet"
+        dataset = f"raw_{self.vendor}"
+        load_parquet_from_gcs(gcs_uri=gcs_uri, dataset=dataset, table=filename)
+        log(
+            logger,
+            "SUCCESS",
+            f"Loaded '{filename}.parquet' into '{dataset}.{filename}'",
+            name="NBAApi",
+        )
+
     @PerfTracker.decorator("Ingest NBA Teams")
     def ingest_teams(self) -> None:
         """
-        Ingests NBA teams data and uploads it to the specified bucket in GCS.
+        Ingests NBA teams data, uploads it to GCS, and loads it into BigQuery.
         """
         teams_data = self.get_teams()
         log(logger, "SUCCESS", "Retrieved NBA teams successfully", name="NBAApi")
         self.upload(data=teams_data, filename="teams")
+        self.load_to_bq(filename="teams")
