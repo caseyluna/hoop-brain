@@ -50,7 +50,7 @@ ingestion-engine (Python) → Parquet in GCS → BigQuery raw_<vendor> datasets
 Containerized via Docker Compose; orchestrated and CI'd via Dagger (`services.yaml`, `pipelines.yaml`); lint/typecheck/test per service. The extension pattern is documented in `docs/ADDING_FEATURES.md` and every stage spec below is written in its terms:
 
 - **New data source:** ingest method in `pipelines/ingestion-engine/src/modules/` → GCS → BQ raw → dbt staging (dedupe) → dbt mart → `sync_jobs.yaml` entry → pipeline wiring.
-- **New model:** module in `pipelines/model-engine/src/models/` reading from marts/Postgres, writing a derived table → wired into `services.yaml`/`pipelines.yaml` → synced to Postgres if the API needs it.
+- **New model:** its own container cloned from the `pipelines/model-engine/` template (`pipelines/model-<name>/`), reading from marts/Postgres, writing a derived table → wired into `services.yaml`/`pipelines.yaml` → synced to Postgres if the API needs it.
 - **New endpoint:** route in `api/app/api/routes/` → Pydantic schema → SQLAlchemy model + Alembic migration if a new table → registered in `api/app/api/api_v1/api.py` → test in `api/tests/`.
 
 **Verified current state:** only `Team` works end-to-end, and it has no league field. `Player` ingestion exists in `nba_api.py` but is not wired downstream. `model-engine` and dbt are stubs. This PRD's roadmap starts exactly there.

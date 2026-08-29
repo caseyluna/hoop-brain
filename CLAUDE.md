@@ -28,7 +28,7 @@ ingestion-engine (Python) → Parquet in GCS → BigQuery raw_<vendor>
   → web (React + TS + Vite + Tailwind, built via Claude Design)
 ```
 
-Docker Compose locally; Dagger orchestration + CI (`services.yaml`, `pipelines.yaml`); scheduled ingestion via GitHub Actions. Extension pattern is documented in `docs/ADDING_FEATURES.md` — follow it for every new source, model, endpoint, and page.
+Docker Compose locally; Dagger orchestration + CI (`services.yaml`, `pipelines.yaml`); scheduled ingestion via GitHub Actions. Extension pattern is documented in `docs/ADDING_FEATURES.md` — follow it for every new source, model, endpoint, and page. `model-engine` in the diagram above is a template, not a shared service: each analytical model (RAPM, traits, surplus value, ...) gets its own container cloned from it (`pipelines/model-<name>/`), never a module bolted onto one shared model-engine.
 
 **Division of computation (a rule):** heavy compute (aggregation, model fitting, percentiles) happens batch in BigQuery/dbt/model-engine; Postgres holds pre-computed read-optimized results; the API does only cheap request-time work. Exceptions (user-chosen inputs, so request-time by necessity): trade validation and Team Fit — both read pre-computed inputs and apply rules logic. Doubly important on Vercel serverless. Use pooled Postgres connections always.
 
