@@ -31,6 +31,18 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def _migration_url() -> str:
+    """
+    Migrations need a direct (unpooled) connection — Neon's pooler runs
+    PgBouncer in transaction mode, which doesn't support the session-level
+    behavior Alembic relies on. Falls back to DATABASE_URL for targets with
+    no pooled/direct distinction (e.g. local Docker Postgres).
+    """
+    url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
+    assert url, "DATABASE_URL_DIRECT or DATABASE_URL must be set in the environment"
+    return url
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -43,8 +55,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = os.getenv("DATABASE_URL")
-    assert url, "DATABASE_URL must be set in the environment"
+    url = _migration_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -64,8 +75,7 @@ def run_migrations_online() -> None:
 
     """
 
-    url = os.getenv("DATABASE_URL")
-    assert url, "DATABASE_URL must be set in the environment"
+    url = _migration_url()
 
     connectable = create_engine(url, poolclass=pool.NullPool)
 
