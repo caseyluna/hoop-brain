@@ -6,3 +6,11 @@ sources:
     tables:
       - name: teams
         description: Raw NBA team records, loaded from GCS Parquet via ingestion-engine's NBAApi.
+      - name: players
+        description: >
+          Raw NBA player records, loaded from GCS Parquet via ingestion-engine's
+          NBAApi.ingest_players(). Full historical + active player index (nba_api's
+          static players list), enriched with current-season bio/roster attributes
+          from LeagueDashPlayerBioStats for players who appeared that season. No
+          birthdate column -- nba_api has no bulk source for it; see NBAApi's
+          class docstring in ingestion-engine.
