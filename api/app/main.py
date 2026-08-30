@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,10 +17,18 @@ def health():
     return {"status": "ok"}
 
 
-# Optional: CORS setup for dev/local web
+# CORS_ORIGINS: comma-separated allowed origins (set in Vercel env for prod).
+# Unset locally falls back to "*" for dev convenience.
+_cors_origins_env = os.getenv("CORS_ORIGINS")
+_allow_origins = (
+    [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
+    if _cors_origins_env
+    else ["*"]
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change this in prod!
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
