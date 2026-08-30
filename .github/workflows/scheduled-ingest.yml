@@ -48,14 +48,13 @@ jobs:
           transformation_engine:
             outputs:
               dev:
-                type: postgres
-                threads: 1
-                host: db
-                port: 5432
-                user: postgres
-                pass: postgres
-                dbname: hoopbrain_test
-                schema: public
+                type: bigquery
+                method: service-account
+                project: hoop-brain
+                dataset: test
+                threads: 4
+                timeout_seconds: 300
+                keyfile: /app/keys/service_account.json
             target: dev
           EOF
 
