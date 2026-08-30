@@ -1,1 +1,10 @@
 keys/
+.neon
+
+# Real secrets (connection strings, credentials). .env.example is the
+# committed template; every other .env* file holds real values and must
+# never be committed. (Also covered by ~/.gitignore_global on this machine,
+# but this repo shouldn't rely solely on a machine-local safety net.)
+.env
+.env.*
+!.env.example

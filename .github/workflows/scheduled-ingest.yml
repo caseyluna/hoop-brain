@@ -37,13 +37,28 @@ jobs:
         env:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
+      # CAL-152: sync-engine and the API's migrations now target the real
+      # Neon database, not local Docker Postgres — the local `db` container
+      # still comes up (docker-compose depends_on) but nothing reads from it
+      # here. Pooled for sync-engine's runtime traffic; direct/unpooled for
+      # Alembic (Neon's pooler can't run its session-level operations — see
+      # api/alembic/env.py). ci.yml's PR-check flow is untouched and keeps
+      # using the local ephemeral test Postgres, not this one.
       - name: Ensure .env.test
         id: env-test
+        env:
+          NEON_DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEON_DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
         run: |
-          cat << 'EOF' > .env.test
+          if [ -z "${NEON_DATABASE_URL}" ] || [ -z "${NEON_DATABASE_URL_DIRECT}" ]; then
+            echo "::error::DATABASE_URL and DATABASE_URL_DIRECT secrets must be set (see CAL-152)"
+            exit 1
+          fi
+          cat << EOF > .env.test
           POSTGRES_DB=hoopbrain_test
           PGPASSWORD=postgres
-          DATABASE_URL=postgresql://postgres:postgres@db:5432/hoopbrain_test
+          DATABASE_URL=${NEON_DATABASE_URL}
+          DATABASE_URL_DIRECT=${NEON_DATABASE_URL_DIRECT}
           GOOGLE_APPLICATION_CREDENTIALS=/keys/service_account.json
           EOF
 
@@ -169,13 +184,17 @@ jobs:
                 cause="GCP_SERVICE_ACCOUNT_JSON secret is missing or empty."
                 suggestion="Check Settings -> Secrets and variables -> Actions -> GCP_SERVICE_ACCOUNT_JSON hasn't expired or been removed."
                 ;;
+              env-test)
+                cause="DATABASE_URL or DATABASE_URL_DIRECT secret is missing or empty (see CAL-152 — sync-engine and Alembic migrations now target Neon)."
+                suggestion="Check Settings -> Secrets and variables -> Actions -> DATABASE_URL / DATABASE_URL_DIRECT hasn't expired or been removed. Get fresh values with \`neon connection-string --pooled\` / \`neon connection-string\` once the workspace is linked."
+                ;;
               build-images)
                 cause="One of the service Docker builds failed."
                 suggestion="Check the run log for which service's build failed, then check for a broken Dockerfile or dependency change in that service's directory."
                 ;;
               migrate)
-                cause="Alembic migration failed against the test Postgres database."
-                suggestion="Check for a new or conflicting migration under api/alembic/versions/."
+                cause="Alembic migration failed against Neon."
+                suggestion="Check for a new or conflicting migration under api/alembic/versions/, or that DATABASE_URL_DIRECT is still a valid direct (non -pooler) Neon connection string."
                 ;;
             esac
           fi
