@@ -28,7 +28,7 @@ ingestion-engine (Python) → Parquet in GCS → BigQuery raw_<vendor>
   → web (React + TS + Vite + Tailwind, built via Claude Design)
 ```
 
-New (not-yet-built) ingestion sources go through hoopR/wehoop (R, via a dedicated invocation utility at `pipelines/ingestion-engine/r/`) as the default entry point rather than bespoke Python scrapers — see `docs/adr/002-hoopr-wehoop-ingestion-entrypoint.md`. Already-shipped sources (NBA/WNBA teams, nba_api/direct-`requests`) are not retroactively rewritten.
+New ingestion sources default to a Python-native path (`nba_api`, `sportsdataverse-py`, or a plain `requests` call to a simple JSON endpoint) — see `docs/adr/003-python-first-ingestion-boundary.md`. hoopR/wehoop (R, via the invocation utility at `pipelines/ingestion-engine/r/`) is a gap-filler for the domains with no reasonable Python path: possession-level lineup/stint data, and scraping targets with no official API either way (Spotrac, HoopsHype, Basketball-Reference, KenPom).
 
 Docker Compose locally; Task (`Taskfile.yml`, one per service + a composing root file) drives both local dev checks and CI; scheduled ingestion via GitHub Actions. Extension pattern is documented in `docs/ADDING_FEATURES.md` — follow it for every new source, model, endpoint, and page. `model-engine` in the diagram above is not one shared service: each analytical model (RAPM, traits, surplus value, ...) is its own self-contained container living as a subdirectory of `pipelines/model-engine/` (`pipelines/model-engine/<name>/`), never a module bolted onto one monolithic model-engine. A `model-engine` orchestrator app to facilitate deploying/running each model subdirectory is planned but not yet built.
 
