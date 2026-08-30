@@ -20,17 +20,26 @@ class NBAApi:
     A client for interacting with the NBA API to fetch raw data, uploading it to GCS
     as optimized Parquet files, and loading it into BigQuery raw_<vendor> tables.
 
-    Birthdate handling (Player ingestion, CAL-147): nba_api has no bulk source for
-    player birthdate. The static `players.get_players()` index (used by
-    `get_players()`) carries no bio fields at all, and the league-wide bulk bio
-    endpoint (`LeagueDashPlayerBioStats`, used by `get_player_bio_stats()`) exposes
-    AGE but not birthdate for anyone -- active or historical. The only nba_api path
-    to a real birthdate is `CommonPlayerInfo`, a per-player call with no bulk
-    equivalent (~5,000 requests to cover the full historical index). That per-player
-    backfill is deliberately out of scope here and deferred to a future ticket,
-    scoped once Tier-2 entity matching (ADR 001) is actually being built -- the same
-    call CAL-159 made independently for WNBA player ingestion, which hit the same
-    "no bulk birthdate source" gap for its league.
+    Bio enrichment (team/age/birthdate) is deliberately NOT solved here -- confirmed
+    it belongs to CAL-255 ("Historical/relocated franchises + is_active/current_team
+    status for players and teams"), not this ticket, whose only job is landing the
+    core player index. Two things confirmed while investigating this:
+
+    1. `LeagueDashPlayerBioStats` (used by `get_player_bio_stats()` below) exposes
+       AGE but never birthdate, and its live stats.nba.com call reliably times out
+       (60s+) from every environment tested so far, including GitHub Actions runners
+       -- not just this sandbox. It degrades gracefully (see `ingest_players()`)
+       rather than failing the whole ingest, but don't expect it to actually
+       populate anything until that's resolved.
+    2. The real fix is `hoopR::load_nba_player_core()` (CAL-252's R-invocation
+       utility) -- ESPN-sourced, not stats.nba.com, so it sidesteps the block
+       entirely. Confirmed live: 591 rows, 36 cols, real `date_of_birth` and
+       `current_team_id` for every row (0 nulls). It's keyed on ESPN's athlete_id,
+       not this module's PERSON_ID, so joining it onto `raw_nba_api.players` needs
+       `hoopR::nba_player_crosswalk()` (confirmed real, 550 rows, has both IDs +
+       `match_confidence`) as the bridge -- a real three-way join with confidence
+       scoring, which is entity-resolution work (ADR 001) properly, not something
+       to improvise inline in a raw ingestion ticket. CAL-255 owns it.
     """
 
     def __init__(
