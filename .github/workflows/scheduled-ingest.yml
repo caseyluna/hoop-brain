@@ -10,6 +10,10 @@ concurrency:
   group: scheduled-ingest
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   scheduled-ingest:
     name: ingest -> BQ -> dbt -> sync
@@ -20,6 +24,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Prepare real GCP credentials
+        id: gcp-creds
         run: |
           if [ -z "${GCP_SERVICE_ACCOUNT_JSON}" ]; then
             echo "::error::GCP_SERVICE_ACCOUNT_JSON must be set"
@@ -33,6 +38,7 @@ jobs:
           GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
 
       - name: Ensure .env.test
+        id: env-test
         run: |
           cat << 'EOF' > .env.test
           POSTGRES_DB=hoopbrain_test
@@ -42,6 +48,7 @@ jobs:
           EOF
 
       - name: Ensure DBT profiles
+        id: dbt-profiles
         run: |
           mkdir -p pipelines/transformation-engine/profiles
           cat << 'EOF' > pipelines/transformation-engine/profiles/profiles.yml
@@ -59,11 +66,13 @@ jobs:
           EOF
 
       - name: Install Task
+        id: install-task
         uses: arduino/setup-task@v2
         with:
           version: "3.x"
 
       - name: Build service images
+        id: build-images
         run: |
           task ingestion:build
           task api:build
@@ -71,11 +80,122 @@ jobs:
           task transformation:build
 
       - name: Apply Postgres migrations
+        id: migrate
         run: task api:migrate-test
 
       - name: Ingest -> BQ -> dbt -> sync
-        run: task ingest-daily
+        id: ingest-daily
+        run: task ingest-daily 2>&1 | tee ingest-daily.log
 
       - name: Tear down local services
         if: always()
         run: docker compose down -v
+
+      # Names the failed step and, for the composed ingest-daily task (which
+      # wraps 6 sub-tasks — see root Taskfile.yml), pinpoints which sub-task
+      # actually broke by parsing Task's own "Failed to run task ..." nesting
+      # out of the captured log — then files/updates a GitHub issue so a
+      # broken pipeline surfaces as an email within minutes instead of rotting
+      # silently (see CAL-155: this repo is worked infrequently).
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GCP_CREDS_OUTCOME: ${{ steps.gcp-creds.outcome }}
+          ENV_TEST_OUTCOME: ${{ steps.env-test.outcome }}
+          DBT_PROFILES_OUTCOME: ${{ steps.dbt-profiles.outcome }}
+          INSTALL_TASK_OUTCOME: ${{ steps.install-task.outcome }}
+          BUILD_IMAGES_OUTCOME: ${{ steps.build-images.outcome }}
+          MIGRATE_OUTCOME: ${{ steps.migrate.outcome }}
+          INGEST_DAILY_OUTCOME: ${{ steps.ingest-daily.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          # First (only, since Task stops the job at the first failing step)
+          # step with outcome=="failure" is the one that broke the run.
+          failed_step="unknown"
+          [ "$GCP_CREDS_OUTCOME" = "failure" ] && failed_step="gcp-creds"
+          [ "$ENV_TEST_OUTCOME" = "failure" ] && failed_step="env-test"
+          [ "$DBT_PROFILES_OUTCOME" = "failure" ] && failed_step="dbt-profiles"
+          [ "$INSTALL_TASK_OUTCOME" = "failure" ] && failed_step="install-task"
+          [ "$BUILD_IMAGES_OUTCOME" = "failure" ] && failed_step="build-images"
+          [ "$MIGRATE_OUTCOME" = "failure" ] && failed_step="migrate"
+          [ "$INGEST_DAILY_OUTCOME" = "failure" ] && failed_step="ingest-daily"
+
+          title="Scheduled pipeline failed"
+          cause="Unrecognized failure point — check the run log directly."
+          suggestion="Open the run and read the last failing step's log."
+
+          if [ "$failed_step" = "ingest-daily" ] && [ -f ingest-daily.log ]; then
+            # e.g. `task: Failed to run task "ingest-daily": task: Failed to
+            # run task "sync:run-main": exit status 1` -> last match is the
+            # innermost (actual) failing sub-task.
+            sub_task=$(sed -n 's/.*Failed to run task "\([^"]*\)".*/\1/p' ingest-daily.log | tail -1 || true)
+            failed_step="ingest-daily / ${sub_task:-unknown sub-task}"
+            case "$sub_task" in
+              ingestion:build)
+                cause="ingestion-engine's Docker build failed."
+                suggestion="Check for a broken Dockerfile or dependency change under pipelines/ingestion-engine/."
+                ;;
+              ingestion:run-main)
+                cause="Ingestion itself failed. Most likely: an upstream API shape change (nba_api or ESPN's WNBA teams endpoint — this is the PRD's #1 likelihood risk, unofficial endpoints break without notice), a rate limit, or a GCP permissions problem writing to GCS/BigQuery."
+                suggestion="Run \`task ingestion:build && task ingestion:run-main\` locally against the same GCP credential to reproduce, then check the source API's response shape."
+                ;;
+              transformation:build)
+                cause="transformation-engine's Docker build failed."
+                suggestion="Check for a broken Dockerfile or dependency change under pipelines/transformation-engine/."
+                ;;
+              transformation:dbt-build)
+                cause="A dbt model or test failed against real BigQuery."
+                suggestion="Check the run log for which model/test failed — usually a schema/type mismatch or a source table dbt expected that ingestion didn't create."
+                ;;
+              sync:build)
+                cause="sync-engine's Docker build failed."
+                suggestion="Check for a broken Dockerfile or dependency change under pipelines/sync-engine/."
+                ;;
+              sync:run-main)
+                cause="The BigQuery -> Postgres sync failed. Often a schema mismatch — a NOT NULL violation or type mismatch between the BQ view and the Postgres table."
+                suggestion="Compare the BQ view's columns/types against the Postgres table's schema (see pipelines/sync-engine/src/jobs/bq_to_postgres.py)."
+                ;;
+              *)
+                cause="One of ingest-daily's sub-tasks failed (ingestion:build, ingestion:run-main, transformation:build, transformation:dbt-build, sync:build, sync:run-main) but the specific one couldn't be parsed from the log."
+                suggestion="Open the run and read ingest-daily.log directly."
+                ;;
+            esac
+          else
+            case "$failed_step" in
+              gcp-creds)
+                cause="GCP_SERVICE_ACCOUNT_JSON secret is missing or empty."
+                suggestion="Check Settings -> Secrets and variables -> Actions -> GCP_SERVICE_ACCOUNT_JSON hasn't expired or been removed."
+                ;;
+              build-images)
+                cause="One of the service Docker builds failed."
+                suggestion="Check the run log for which service's build failed, then check for a broken Dockerfile or dependency change in that service's directory."
+                ;;
+              migrate)
+                cause="Alembic migration failed against the test Postgres database."
+                suggestion="Check for a new or conflicting migration under api/alembic/versions/."
+                ;;
+            esac
+          fi
+
+          body=$(cat <<BODY_EOF
+          ## What failed
+          **Step:** \`${failed_step}\`
+          **Run:** ${RUN_URL}
+
+          ## Likely cause
+          ${cause}
+
+          ## Suggested next step
+          ${suggestion}
+          BODY_EOF
+          )
+
+          existing=$(gh issue list --search "in:title \"${title}\"" --state open --json number --jq '.[0].number' || true)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi
