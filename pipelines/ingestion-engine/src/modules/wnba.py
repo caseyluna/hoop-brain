@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Dict, List
 
+import polars as pl
 import requests
 
 from core.bigquery_utils import load_parquet_from_gcs
@@ -21,6 +23,27 @@ logger = get_logger(__name__)
 ESPN_WNBA_TEAMS_URL = (
     "https://site.api.espn.com/apis/site/v2/sports/basketball/wnba/teams"
 )
+
+
+def _na(value):
+    """
+    R's readr::write_csv (used by the shared R-invocation utility, CAL-252) writes
+    missing values as the literal string "NA", not an empty cell -- so every column
+    from an R-produced CSV, numeric or not, can come back as the string "NA" rather
+    than a real null. Normalize that (and empty/whitespace-only strings) to None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped if stripped and stripped != "NA" else None
+    return value
+
+
+def _int(value):
+    """Like `_na`, but coerces to int when a real value is present."""
+    cleaned = _na(value)
+    return int(cleaned) if cleaned is not None else None
 
 
 class WNBAApi:
@@ -67,6 +90,70 @@ class WNBAApi:
             }
             for team in raw_teams
         ]
+
+    @staticmethod
+    @PerfTracker.decorator("Read WNBA Players")
+    def get_players(csv_path: Path) -> List[Dict]:
+        """
+        Reads the CSV written by `wehoop::wnba_playerindex()` (pulled separately via the
+        shared R-invocation utility, pipelines/ingestion-engine/r, CAL-252/CAL-159) and
+        reshapes it into our player record schema.
+
+        Design note: `wnba_playerindex()` is the confirmed wehoop equivalent of hoopR's
+        `nba_playerindex()` (verified against wehoop's pkgdown reference and a real pull —
+        26 columns, ~1200 rows, all-time roster since `historical=1` is the default). It
+        does **not** return a birthdate column. `wnba_commonteamroster()` does (BIRTH_DATE),
+        but only per-team, which would mean looping over ~13 team IDs and joining — real
+        extra scope this ticket doesn't need, since the Tier-2 resolver step that would
+        consume birthdate is itself blocked on CAL-148/150. Landing player-index without
+        birthdate now, flagged here, keeps this ticket to its one-function scope; a
+        birthdate backfill via commonteamroster is a candidate follow-up once the resolver
+        actually gets built.
+
+        Args:
+            csv_path (Path): Path to the CSV written by the R utility.
+
+        Returns:
+            list[dict]: A list of dictionaries containing player information.
+        """
+        log(
+            logger,
+            "INFO",
+            f"Reading WNBA player index from {csv_path}",
+            name="WNBAApi",
+        )
+        df = pl.read_csv(csv_path, infer_schema_length=None)
+        records = df.to_dicts()
+        players = []
+        for row in records:
+            first_name = _na(row.get("PLAYER_FIRST_NAME"))
+            last_name = _na(row.get("PLAYER_LAST_NAME"))
+            full_name = " ".join(n for n in (first_name, last_name) if n) or None
+            players.append(
+                {
+                    "id": _int(row["PERSON_ID"]),
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "full_name": full_name,
+                    "team_id": _int(row.get("TEAM_ID")),
+                    "team_city": _na(row.get("TEAM_CITY")),
+                    "team_name": _na(row.get("TEAM_NAME")),
+                    "team_abbreviation": _na(row.get("TEAM_ABBREVIATION")),
+                    "jersey_number": _na(row.get("JERSEY_NUMBER")),
+                    "position": _na(row.get("POSITION")),
+                    "height": _na(row.get("HEIGHT")),
+                    "weight": _int(row.get("WEIGHT")),
+                    "college": _na(row.get("COLLEGE")),
+                    "country": _na(row.get("COUNTRY")),
+                    "draft_year": _int(row.get("DRAFT_YEAR")),
+                    "draft_round": _int(row.get("DRAFT_ROUND")),
+                    "draft_number": _int(row.get("DRAFT_NUMBER")),
+                    "roster_status": _na(row.get("ROSTER_STATUS")),
+                    "from_year": _int(row.get("FROM_YEAR")),
+                    "to_year": _int(row.get("TO_YEAR")),
+                }
+            )
+        return players
 
     @PerfTracker.decorator("Upload Data to GCS")
     def upload(self, data: List[Dict], filename: str, lazy: bool = False) -> None:
@@ -126,3 +213,25 @@ class WNBAApi:
             team["league"] = "WNBA"
         self.upload(data=teams_data, filename="teams")
         self.load_to_bq(filename="teams")
+
+    @PerfTracker.decorator("Ingest WNBA Players")
+    def ingest_players(self, csv_path: Path) -> None:
+        """
+        Ingests the WNBA player index (pulled via `wehoop::wnba_playerindex()` ahead of
+        this call, see `task ingestion:r-wnba-players`), tags it with league, uploads it
+        to GCS, and loads it into BigQuery (`raw_wehoop.players`).
+
+        Source player IDs (`PERSON_ID`) go through the Tier-1 resolver as their own
+        authoritative source (`source="wehoop"`) once the resolver exists (CAL-148/150) —
+        never matched against `nba_api` rows. This step only lands the raw data.
+
+        Args:
+            csv_path (Path): Path to the CSV written by the R utility for this pull.
+        """
+        players_data = self.get_players(csv_path=csv_path)
+        log(logger, "SUCCESS", "Retrieved WNBA players successfully", name="WNBAApi")
+        # the WNBA adapter tags its own records; nba_api tags its own as NBA.
+        for player in players_data:
+            player["league"] = "WNBA"
+        self.upload(data=players_data, filename="players")
+        self.load_to_bq(filename="players")
