@@ -68,6 +68,22 @@ tasks:
         -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
         {{.IMAGE_NAME}} uv run python src/modules/hoopr_bridge.py r/output/nba_injuries.csv nba_injuries
 
+  r-wnba-players:
+    desc: >-
+      Pull the WNBA player index via wehoop::wnba_playerindex and land it in
+      raw_wehoop.players (CAL-159). Real, network-verified. No birthdate in this
+      function's output -- see WNBAApi.get_players() docstring for why that's
+      deferred rather than solved here.
+    cmds:
+      - mkdir -p r/output
+      - >-
+        docker run --rm -v $PWD/r/output:/output
+        {{.SERVICE_NAME}}-r-dev "wehoop::wnba_playerindex" "{}" /output/wnba_players
+      - >-
+        docker run --rm -v $PWD:/app -v /app/.venv -w /app
+        -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
+        {{.IMAGE_NAME}} uv run python src/main.py
+
   ci:
     desc: Run CI checks for {{.SERVICE_NAME}}
     cmds:
