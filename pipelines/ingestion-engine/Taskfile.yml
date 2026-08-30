@@ -40,6 +40,34 @@ tasks:
         -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
         {{.IMAGE_NAME}} uv run python src/main.py
 
+  r-build:
+    desc: "Build the hoopR/wehoop invocation utility image (CAL-252)"
+    dir: r
+    cmds:
+      - docker build -t {{.SERVICE_NAME}}-r-dev .
+
+  r-run:
+    desc: >-
+      Run one hoopR/wehoop function and land its output at r/output/<name>.csv.
+      Usage: task ingestion:r-run -- "hoopR::espn_nba_injuries" '{"season": 2026}' nba_injuries
+    cmds:
+      - mkdir -p r/output
+      - >-
+        docker run --rm -v $PWD/r/output:/output
+        {{.SERVICE_NAME}}-r-dev "{{index .CLI_ARGS 0}}" '{{index .CLI_ARGS 1}}' /output/{{index .CLI_ARGS 2}}
+
+  r-example-nba-injuries:
+    desc: "Proof-of-concept (CAL-252): pull current NBA injuries via hoopR, land in raw_hoopr.nba_injuries"
+    cmds:
+      - mkdir -p r/output
+      - >-
+        docker run --rm -v $PWD/r/output:/output
+        {{.SERVICE_NAME}}-r-dev "hoopR::espn_nba_injuries" "{}" /output/nba_injuries
+      - >-
+        docker run --rm -v $PWD:/app -v /app/.venv -w /app
+        -e GOOGLE_APPLICATION_CREDENTIALS=/app/keys/service_account.json
+        {{.IMAGE_NAME}} uv run python src/modules/hoopr_bridge.py r/output/nba_injuries.csv nba_injuries
+
   ci:
     desc: Run CI checks for {{.SERVICE_NAME}}
     cmds:
