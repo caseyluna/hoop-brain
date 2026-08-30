@@ -32,9 +32,15 @@ Root `Taskfile.yml` composes all of this into one task — `task ingest-daily` r
 task ingest-daily
 ```
 
-**Gap today — no GitHub Actions schedule.** CLAUDE.md's "scheduled ingestion via GitHub Actions" is the target architecture, but no workflow in `.github/workflows/` triggers `task ingest-daily` on a cron yet — it only runs when invoked by hand.
+`.github/workflows/scheduled-ingest.yml` runs this daily via cron (also triggerable by hand via `workflow_dispatch`).
 
 **Files to touch:** ingestion-engine module, `sources.yml`, dbt staging + mart models, `sync_jobs.yaml`.
+
+### Running several New Data Source tickets in parallel (worktrees/agents)
+
+- **Don't run `docker compose up` (or anything binding host ports 5432/8000/5173) from more than one worktree at a time** — they're fixed host-port binds in `docker-compose.yaml`, so two worktrees running it concurrently collide. Verify your source's ingestion/staging/mart logic through its own service's `task <ns>:build` + `task <ns>:test` (no fixed ports) and let the opened PR's CI (isolated runner per PR) be the source of truth for the full `task ingest-daily` chain, rather than running that chain locally while other worktrees might be doing the same.
+- **Stick to your own files.** A new source only needs its own `pipelines/ingestion-engine/src/modules/<source>.py` (+ tests) and its own `models/staging/<source>/`. Only touch `sync_jobs.yaml` / root `Taskfile.yml` / `ci.yml` if your ticket's steps explicitly call for it — those are shared files every parallel ticket would otherwise collide on.
+- **Rate limits are ours to set, not the source's to publish.** Most of these sources (nba_api, stats.wnba.com, and every scraped site below) don't publish an official rate limit. Default to **no more than 1 request/second, sequential (not concurrent) per source**, with a real `User-Agent` identifying a normal browser — tighten further for small/volunteer-run sites (Basketball-Reference, DARKO, databallr, Her Hoop Stats) per their own notes in the source catalog. Never run two ingestion jobs against the *same* external host concurrently, even from different tickets/agents.
 
 ---
 

@@ -70,17 +70,11 @@ jobs:
           task sync:build
           task transformation:build
 
-      - name: Ingest -> GCS -> BigQuery raw
-        run: task ingestion:run-main
-
       - name: Apply Postgres migrations
         run: task api:migrate-test
 
-      - name: Transform (dbt)
-        run: task transformation:dbt-build
-
-      - name: Sync BigQuery -> Postgres
-        run: task sync:run-main
+      - name: Ingest -> BQ -> dbt -> sync
+        run: task ingest-daily
 
       - name: Tear down local services
         if: always()
