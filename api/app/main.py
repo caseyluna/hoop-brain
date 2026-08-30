@@ -1,9 +1,10 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.api_v1.api import router as api_router
+from app.core.security import require_api_key
 
 app = FastAPI(
     title="Hoop Brain API",
@@ -34,5 +35,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Versioned API routes
-app.include_router(api_router, prefix="/api/v1")
+# Versioned API routes — gated by a shared API key (see app/core/security.py).
+# /health and the auto-generated docs (/docs, /redoc, /openapi.json) stay
+# open: they don't touch the database, so there's nothing to spam or protect.
+app.include_router(
+    api_router, prefix="/api/v1", dependencies=[Depends(require_api_key)]
+)
