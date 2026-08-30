@@ -1,6 +1,6 @@
 # ADR 002: hoopR/wehoop as the primary ingestion entry point
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 003](003-python-first-ingestion-boundary.md) (2026-08-30, same day) — the "hoopR/wehoop as default for everything new" boundary below turned out to be wrong: most core-stats domains already have a perfectly good Python-native path (`nba_api`, `sportsdataverse-py`, or a plain `requests` call), and reaching for R there was unnecessary. Kept for the historical record and because the research/mechanism sections below (CAL-252's R-invocation utility, the confirmed function list) are still accurate and still used — just not as the *default*.
 **Date:** 2026-08-30
 **Ticket:** CAL-251 (decision), CAL-252 (shared plumbing)
 
