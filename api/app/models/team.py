@@ -12,8 +12,10 @@ class Team(Base):
     abbreviation = Column(String, nullable=False)
     nickname = Column(String, nullable=False)
     city = Column(String, nullable=False)
-    state = Column(String, nullable=False)
-    year_founded = Column(Integer, nullable=False)
+    # Nullable: ESPN's WNBA teams source doesn't publish either field, unlike
+    # nba_api's NBA teams (see stg_wehoop__teams.sql in transformation-engine).
+    state = Column(String, nullable=True)
+    year_founded = Column(Integer, nullable=True)
     league = Column(
         Enum(League, name="league"),
         nullable=False,
