@@ -36,6 +36,20 @@ task ingest-daily
 
 **Files to touch:** ingestion-engine module, `sources.yml`, dbt staging + mart models, `sync_jobs.yaml`.
 
+### Alternative ingest path: hoopR/wehoop (R)
+
+Per `docs/adr/002-hoopr-wehoop-ingestion-entrypoint.md`, new sources with a real hoopR/wehoop function (most stats/on-off/lineups/injuries/transactions/shot-charts/tracking/hustle/draft/salary/college domains do — check `hoopr.sportsdataverse.org`/`wehoop.sportsdataverse.org`'s reference index first) go through this instead of a bespoke Python client, using the shared R-invocation utility at `pipelines/ingestion-engine/r/`:
+
+| Step | What to do |
+|------|------------|
+| 1. Pull | `task ingestion:r-build` once (builds the `ingestion-engine-r-dev` image — slow, ~5-6 min, mostly R package compilation. Rebuild only if `r/Dockerfile` changes). Then `task ingestion:r-run -- "hoopR::<function>" '{"arg": "value"}' <output_name>` — runs the function, writes `pipelines/ingestion-engine/r/output/<output_name>.csv` (or `<output_name>__<part>.csv` per part, for functions returning a named list of data frames, e.g. on/off summaries). |
+| 2. Carry through | `uv run python src/modules/hoopr_bridge.py <csv_path> <filename>` — reads the CSV, uploads as Parquet to GCS, loads into `raw_hoopr.<filename>`. Same GCS→BQ path every Python source uses (`core/storage_utils.py`/`core/bigquery_utils.py`), just fed from R's output instead of a Python API client. |
+| 3. Staging/mart/sync | Same as §1 steps 3-5 above, no difference once the data is in `raw_hoopr.*`. |
+
+`task ingestion:r-example-nba-injuries` is a working, real (network-verified) example of both steps chained — copy its shape for a new source rather than starting from scratch. Requires `GOOGLE_APPLICATION_CREDENTIALS` same as any other ingestion run.
+
+**Not yet built:** a single composed task chaining steps 1-2 together generically (today you run them as two explicit commands per source, function name and args differ per call). Revisit once 3+ hoopR-backed sources exist and the duplication is real, not before.
+
 ### Running several New Data Source tickets in parallel (worktrees/agents)
 
 - **Don't run `docker compose up` (or anything binding host ports 5432/8000/5173) from more than one worktree at a time** — they're fixed host-port binds in `docker-compose.yaml`, so two worktrees running it concurrently collide. Verify your source's ingestion/staging/mart logic through its own service's `task <ns>:build` + `task <ns>:test` (no fixed ports) and let the opened PR's CI (isolated runner per PR) be the source of truth for the full `task ingest-daily` chain, rather than running that chain locally while other worktrees might be doing the same.
