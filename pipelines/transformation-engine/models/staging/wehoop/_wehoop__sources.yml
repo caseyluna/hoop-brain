@@ -6,3 +6,5 @@ sources:
     tables:
       - name: teams
         description: Raw WNBA team records, loaded from GCS Parquet via ingestion-engine's WNBAApi.
+      - name: players
+        description: Raw WNBA player index records (wehoop::wnba_playerindex via CAL-252), loaded from GCS Parquet via ingestion-engine's WNBAApi.
