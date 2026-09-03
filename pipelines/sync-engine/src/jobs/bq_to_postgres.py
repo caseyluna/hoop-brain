@@ -62,9 +62,9 @@ class BQToPostgresJob(BaseJob):
         pg_table_exists = self.pg_table in existing_tables
 
         # Reflect column types before opening the swap transaction below — once
-        # that transaction truncates pg_table, a second pooled connection (which
-        # is what an Engine-bound inspector checks out to reflect) would block
-        # on the still-uncommitted TRUNCATE's lock, deadlocking against itself.
+        # that transaction deletes pg_table's rows, a second pooled connection
+        # (which is what an Engine-bound inspector checks out to reflect) would
+        # block on the still-uncommitted DELETE's lock, deadlocking against itself.
         select_list = (
             self._build_cast_select_list(inspector, tmp_table)
             if pg_table_exists
@@ -73,8 +73,17 @@ class BQToPostgresJob(BaseJob):
 
         with self.pg_engine.begin() as conn:
             if pg_table_exists:
-                logger.info(f"Truncating existing table {self.pg_table}")
-                conn.execute(text(f"TRUNCATE TABLE {self.pg_table}"))
+                # DELETE, not TRUNCATE (CAL-150): TRUNCATE refuses outright,
+                # regardless of deferrable settings, when another table (e.g.
+                # players.current_team_id -> teams.id) currently references
+                # this one -- Postgres treats it as a DDL-level operation, not
+                # subject to per-row/deferred FK checking. Plain DELETE inside
+                # this same transaction respects a DEFERRABLE INITIALLY
+                # DEFERRED FK instead: the momentary gap while rows are
+                # replaced is only checked at COMMIT, by which point the
+                # reinserted rows (same ids) satisfy it again.
+                logger.info(f"Deleting existing rows from {self.pg_table}")
+                conn.execute(text(f'DELETE FROM "{self.pg_table}"'))
             else:
                 logger.info(f"Creating new table {self.pg_table} from {tmp_table}")
                 conn.execute(text(f"ALTER TABLE {tmp_table} RENAME TO {self.pg_table}"))

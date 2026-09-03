@@ -10,3 +10,17 @@ models:
           - not_null
           - accepted_values:
               values: ["NBA", "WNBA"]
+
+  - name: players
+    description: NBA + WNBA players mart. Union of stg_nba_api__players and stg_wehoop__players, disambiguated by league — no cross-source matching needed since players from different leagues are never the same person. This is raw-source-keyed (nba_api PERSON_ID / wehoop PERSON_ID), NOT internal player_id — CAL-150's Tier-1 resolver reads this view and mints the internal id, matching CAL-145/CAL-249's teams pattern one entity later.
+    columns:
+      - name: id
+        description: Raw source player ID (nba_api or wehoop PERSON_ID depending on league) — NOT the internal surrogate id, see docs/adr/001-player-identity.md.
+        tests:
+          - not_null
+      - name: league
+        description: NBA or WNBA.
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["NBA", "WNBA"]
