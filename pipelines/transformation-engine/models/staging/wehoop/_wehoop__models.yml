@@ -13,3 +13,16 @@ models:
         description: League the team belongs to. Always 'WNBA' for this source.
         tests:
           - not_null
+
+  - name: stg_wehoop__players
+    description: Deduped WNBA player records staged from raw_wehoop.players. No birthdate column (wnba_playerindex doesn't return one) - see WNBAApi.get_players()'s docstring.
+    columns:
+      - name: id
+        description: wehoop/stats.wnba.com PERSON_ID (primary key).
+        tests:
+          - unique
+          - not_null
+      - name: league
+        description: League the player belongs to. Always 'WNBA' for this source.
+        tests:
+          - not_null
