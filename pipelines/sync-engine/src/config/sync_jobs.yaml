@@ -2,3 +2,10 @@ bq_to_postgres:
   - bq_view: marts.teams
     pg_table: teams
     primary_key: id
+
+# Structurally different from bq_to_postgres above: these mint/reuse internal
+# surrogate ids (docs/adr/001-player-identity.md) rather than truncate-and-
+# replace, so a straight BQ->Postgres copy would break idempotency (a fresh
+# id every run). See src/jobs/player_resolver.py (CAL-150).
+player_resolver:
+  - bq_view: marts.players
