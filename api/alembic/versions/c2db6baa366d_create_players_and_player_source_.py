@@ -46,7 +46,16 @@ def upgrade() -> None:
         sa.Column("height", sa.String(), nullable=True),
         sa.Column("current_team_id", sa.Integer(), nullable=True),
         sa.Column("is_active", sa.Boolean(), server_default="true", nullable=False),
-        sa.ForeignKeyConstraint(["current_team_id"], ["teams.id"]),
+        # deferrable/initially deferred: CAL-150's resolver runs in the same
+        # transaction as the teams sync's delete+reinsert (bq_to_postgres.py) --
+        # without this, Postgres checks the FK per-statement and rejects the
+        # momentary gap while teams rows are being replaced.
+        sa.ForeignKeyConstraint(
+            ["current_team_id"],
+            ["teams.id"],
+            deferrable=True,
+            initially="DEFERRED",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_players_id"), "players", ["id"], unique=False)
